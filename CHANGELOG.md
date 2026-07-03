@@ -5,6 +5,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Bump low-risk Terraform versions (#10): `hashicorp/azurerm` provider
+  `=4.58.0` → `=4.80.0`, `Azure/naming/azurerm` module `0.4.2` → `0.4.3`, and
+  `Azure/avm-res-network-networksecuritygroup/azurerm` module `0.5.0` → `0.5.1`.
+  Refreshed `.terraform.lock.hcl` (also relocks the transitive random `3.9.0`, tls
+  `4.3.0` and modtm `0.4.0` providers). The `Azure/azapi` provider stays pinned at
+  `=2.7.0` and the other AVM modules are unchanged.
+
 ### Added
 
 - CI workflow `.github/workflows/terraform.yml` running on pull requests that touch
