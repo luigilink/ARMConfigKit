@@ -1,0 +1,35 @@
+# --- Terraform ---------------------------------------------------------------
+# Local .terraform directories (provider/module cache — large binaries)
+**/.terraform/*
+
+# State files hold resource IDs, IP plans and can embed secrets — never commit.
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# .tfvars hold sensitive data (admin password, subscription id, ...).
+# Everything is ignored EXCEPT the tracked *.example template.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Plan output and CLI config
+*.tfplan
+.terraformrc
+terraform.rc
+
+# Override files (local-only resource overrides)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform apply/plan console dumps kept locally
+changes.txt
+
+# --- Editors / OS ------------------------------------------------------------
+.vscode/
+**/.DS_Store
