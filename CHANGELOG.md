@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Fix a resource-group dependency race in the VM module wiring (#12): the `vm`
+  module took `resource_group_name`/`location` from local string values, so
+  Terraform saw no dependency on `azurerm_resource_group.rg` and could create the
+  VM disks/public IPs before the resource group existed (`ResourceGroupNotFound` at
+  apply). It now references `azurerm_resource_group.rg.name`/`.location` and has an
+  explicit `depends_on` on the resource group and the virtual network. Found by a
+  real `terraform apply`.
+- Remove the `ip_tags = { FirstPartyUsage = "/Unprivileged" }` from the Bastion
+  public IP (#12): that Microsoft first-party tag requires the
+  `Microsoft.Network/AllowBringYourOwnPublicIpAddress` subscription feature and made
+  the public IP fail to create on subscriptions without it. Removing it makes the
+  lab portable across subscriptions.
 - **Credentials are now user-provided and required** (#12): removed the generated
   `random_password` and the deprecated top-level `admin_username`/`admin_password`
   module inputs; credentials flow only through `account_credentials`.

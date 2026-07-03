@@ -125,9 +125,6 @@ resource "azurerm_public_ip" "bastion_pip" {
   sku                 = "Standard"
   tags                = {}
   zones               = ["1", "2", "3"]
-  ip_tags = {
-    FirstPartyUsage = "/Unprivileged"
-  }
 }
 
 # Create Network security group
@@ -167,8 +164,8 @@ module "vm" {
 
   # Basic identity
   name                = each.value.name
-  resource_group_name = local.az_resource_group_name
-  location            = local.az_resource_group_location
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
 
   # Windows host constraints: <= 15 chars for NetBIOS computer name
   computer_name = substr(each.value.name, 0, 15)
@@ -258,6 +255,11 @@ module "vm" {
       }
     }
   }
+
+  depends_on = [
+    azurerm_resource_group.rg,
+    module.vnet
+  ]
 }
 
 # Resources for Azure Bastion Basic SKU
