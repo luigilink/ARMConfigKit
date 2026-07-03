@@ -1,0 +1,79 @@
+name: Bug Report
+description: File a bug report.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+projects: ["ARMConfigKit"]
+assignees:
+  - luigilink
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: input
+    id: contact
+    attributes:
+      label: Contact Details (Optional)
+      description: How can we get in touch with you if we need more info?
+      placeholder: ex. email@example.com
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us, what did you expect to happen?
+      placeholder: Tell us what you see!
+      value: "A bug happened!"
+    validations:
+      required: true
+  - type: dropdown
+    id: version
+    attributes:
+      label: Version
+      description: What version of ARMConfigKit are you running?
+      options:
+        - 1.x
+        - 0.x
+      default: 1
+    validations:
+      required: true
+  - type: input
+    id: terraform-version
+    attributes:
+      label: Terraform version
+      description: Output of `terraform version`.
+      placeholder: e.g. 1.9.5
+    validations:
+      required: false
+  - type: input
+    id: azcli-version
+    attributes:
+      label: Azure CLI version
+      description: Output of `az version` (relevant for the disk/VM scripts).
+      placeholder: e.g. 2.64.0
+    validations:
+      required: false
+  - type: dropdown
+    id: powershell
+    attributes:
+      label: What version of PowerShell are you running?
+      description: Relevant for the scripts under scripts/ (they target PowerShell 7+).
+      multiple: true
+      options:
+        - 7.x
+        - 5.1
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: shell
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/luigilink/ARMConfigKit/blob/main/CODE_OF_CONDUCT.md).
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
