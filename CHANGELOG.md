@@ -5,7 +5,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Pester test suite `tests/StartAzVM.Tests.ps1` covering `Get-VMDisk`,
+  `Get-DiskSkuUpdatePlan`, `Get-DiskSku` and `Set-DiskSku` (15 tests, no real Azure
+  calls) (#6).
+- CI workflow `.github/workflows/pester.yml` running on pull requests: a Pester job
+  (`windows-latest`, `./tests`) and a PSScriptAnalyzer code-quality job that fails on
+  any finding under `scripts/` (#6).
+- `.gitattributes` locking the encoding/line-ending policy (`*.ps1`/`*.psm1`/`*.psd1`
+  UTF-8 BOM + CRLF; Terraform, YAML, Markdown and JSON as LF without BOM) (#6).
+
 ### Changed
+
+- `scripts/StartAzVM.ps1` is now testable (#6): the per-disk SKU decision logic was
+  extracted into a pure `Get-DiskSkuUpdatePlan` helper (used by the parallel block),
+  and a dot-source guard (`$MyInvocation.InvocationName -eq '.'`) prevents the
+  remediation from running when the script is dot-sourced by the tests.
 
 - `scripts/StartAzVM.ps1` is now clean under PSScriptAnalyzer (#4): `Set-DiskSku`
   uses `[CmdletBinding(SupportsShouldProcess)]` with `$PSCmdlet.ShouldProcess`
