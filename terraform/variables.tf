@@ -43,7 +43,7 @@ variable "adds_domain_admin_password" {
 
 variable "location" {
   type        = string
-  default     = "francecentral"
+  default     = "eastus"
   description = "The Azure region for the whole lab. The resource group is created in this region and every other resource inherits the resource group's location, so this single value places the entire farm. Choose a region with capacity for the VM sizes used."
   nullable    = false
 }
