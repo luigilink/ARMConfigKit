@@ -1,4 +1,4 @@
-# Requires: Azure CLI installed and logged in (az login)
+﻿# Requires: Azure CLI installed and logged in (az login)
 # Requires: PowerShell 7+ (uses ForEach-Object -Parallel)
 # Scope: Update all managed disks (OS + data) on each VM in a resource group to StandardSSD_LRS
 #        The VMs are processed in parallel to speed up a full remediation pass.
@@ -31,20 +31,20 @@ function Get-DiskSku {
 }
 
 function Set-DiskSku {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([bool])]
     param(
         [string]$DiskId,
-        [string]$NewSku,
-        [switch]$WhatIf
+        [string]$NewSku
     )
-    if ($WhatIf) {
-        Write-Host "  [WhatIf] Would run: az disk update --ids $DiskId --sku $NewSku" -ForegroundColor Yellow
+    if (-not $PSCmdlet.ShouldProcess($DiskId, "Update disk SKU to $NewSku")) {
         return $true
     }
     $null = az disk update --ids $DiskId --sku $NewSku --only-show-errors
     return $LASTEXITCODE -eq 0
 }
 
-function Get-VMDisks {
+function Get-VMDisk {
     <#
       Returns an object:
       @{
@@ -113,7 +113,7 @@ if (-not $vmList -or $vmList.Count -eq 0) {
 # defined above) rather than duplicating their bodies.
 $getDiskSkuDef = ${function:Get-DiskSku}.ToString()
 $setDiskSkuDef = ${function:Set-DiskSku}.ToString()
-$getVMDisksDef = ${function:Get-VMDisks}.ToString()
+$getVMDisksDef = ${function:Get-VMDisk}.ToString()
 
 $results = $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
     # ---- Re-hydrate the parent scope -------------------------------------
@@ -129,7 +129,7 @@ $results = $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
     # definitions.
     ${function:Get-DiskSku} = $using:getDiskSkuDef
     ${function:Set-DiskSku} = $using:setDiskSkuDef
-    ${function:Get-VMDisks} = $using:getVMDisksDef
+    ${function:Get-VMDisk} = $using:getVMDisksDef
 
     $vm     = $_
     $vmName = $vm.name
@@ -146,7 +146,7 @@ $results = $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
 
     Write-Host "`n===== VM: $vmName =====" -ForegroundColor Cyan
 
-    $vmDisks = Get-VMDisks -VmJson $vm
+    $vmDisks = Get-VMDisk -VmJson $vm
 
     # Collect all candidate disk IDs (OS + data), skipping nulls and ephemeral OS
     $diskIds = @()
