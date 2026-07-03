@@ -3,6 +3,17 @@ variable "resource_group_name" {
   description = "Name of the resource group to create and/or use for this deployment."
 }
 
+variable "resource_short_name" {
+  type        = string
+  default     = ""
+  description = <<EOF
+    Short prefix used to name the resources (e.g. "armck" -> "armck-VNET").
+    - Leave empty (default) to derive it automatically from resource_group_name
+      (lowercased, non-alphanumeric characters removed, truncated to 12 characters).
+    - Set an explicit value to use a custom short prefix.
+  EOF
+}
+
 variable "arm_subscription_id" {
   description = "The subscription ID to use for this deployment."
   default     = ""
