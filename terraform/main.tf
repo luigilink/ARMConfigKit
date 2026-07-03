@@ -4,7 +4,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=4.58.0"
+      version = "=4.80.0"
     }
     azapi = {
       source  = "Azure/azapi"
@@ -68,7 +68,7 @@ locals {
 # These modules are used to generate consistent names and select regions based on availability zones
 module "naming" {
   source  = "Azure/naming/azurerm"
-  version = "0.4.2"
+  version = "0.4.3"
 }
 
 module "regions" {
@@ -147,7 +147,7 @@ resource "azurerm_public_ip" "bastion_pip" {
 # Create Network security group
 module "nsg_subnet_main" {
   source              = "Azure/avm-res-network-networksecuritygroup/azurerm"
-  version             = "0.5.0"
+  version             = "0.5.1"
   name                = "${local.az_resource_short_name}-VNET-NSG"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
