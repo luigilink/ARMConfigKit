@@ -15,8 +15,8 @@ arm_subscription_id = "00000000-0000-0000-0000-000000000000"
 # location, so this single value places the entire farm (RG, network, VMs,
 # Bastion). Pick a region with capacity for the VM sizes in vms_informations;
 # if you set enable_availability_zones = true, also pick a region that supports
-# a zonal Azure Bastion (e.g. westeurope).
-location = "francecentral"
+# a zonal Azure Bastion (e.g. eastus).
+location = "eastus"
 
 # Active Directory domain administrator credentials.
 adds_domain_admin_username = "labadmin"

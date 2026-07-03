@@ -5,6 +5,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Change the default `location` from `francecentral` to `eastus` (#14): the MCAPS
+  subscription is US-based and East US has capacity for the lab VM sizes and supports
+  a zonal Bastion. The lab is single-region: every resource inherits the resource
+  group's location from `var.location`.
+
 ### Added
 
 - `enable_availability_zones` variable (default `false`) to control zonal placement
