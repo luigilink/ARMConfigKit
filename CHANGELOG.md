@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `scripts/StartAzVM.ps1` is now safe to run unattended (#4):
+  - The `az vm list` call is validated — a non-zero az exit code (expired login,
+    wrong/empty resource group, missing permissions) now fails loudly with
+    `exit 1` instead of being masked as "No VMs found", and invalid JSON is caught
+    instead of throwing an unhandled parser error.
+  - The parallel block emits a per-VM result object; the script prints a summary
+    table and exits non-zero if any VM had a failed disk update, could not be
+    deallocated, or was left deallocated because it failed to start again.
+  - `$whatIf` now defaults to `$true` (dry-run) so a first run previews changes
+    instead of immediately mutating disks; set it to `$false` to execute.
 - `scripts/StartAzVM.ps1` now processes the resource group's VMs concurrently with
   `ForEach-Object -Parallel` (PowerShell 7) instead of a sequential `foreach`,
   speeding up a full disk-SKU remediation pass (#2). Parent-scope variables are
