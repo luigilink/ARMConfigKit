@@ -11,6 +11,13 @@
 # Target Azure subscription ID (az account show --query id -o tsv)
 arm_subscription_id = "00000000-0000-0000-0000-000000000000"
 
+# Azure region for the whole lab. Every resource inherits the resource group's
+# location, so this single value places the entire farm (RG, network, VMs,
+# Bastion). Pick a region with capacity for the VM sizes in vms_informations;
+# if you set enable_availability_zones = true, also pick a region that supports
+# a zonal Azure Bastion (e.g. westeurope).
+location = "francecentral"
+
 # Active Directory domain administrator credentials.
 adds_domain_admin_username = "labadmin"
 # Required. Azure Windows password rules: 12-123 characters with complexity.
@@ -18,10 +25,14 @@ adds_domain_admin_password = "ChangeMe-Str0ng!Passw0rd"
 
 # --- Common optional overrides ----------------------------------------------
 
-# resource_group_name = "rg-sps-se"
-# location            = "francecentral"
+# resource_group_name = "RG-SPSE-SmallFarm"
 # adds_fqdn           = "contoso.com"
 # sharepoint_version  = "Subscription-Latest"
+
+# Pin VMs / public IPs / Bastion to availability zones 1/2/3. Default false
+# (non-zonal) avoids single-zone capacity restrictions and works where a zonal
+# Bastion is unsupported. Only enable in a region that supports both.
+# enable_availability_zones = false
 
 # Auto-shutdown time (24h HHmm). Set to "9999" to disable the automatic shutdown
 # (e.g. for a production-like farm that should stay running).
