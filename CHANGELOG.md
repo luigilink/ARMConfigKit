@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bump `actions/checkout` from v4 to v5 in all workflows (release, wiki, pester) to
+  move off the deprecated Node.js 20 runtime (#6).
 - `scripts/StartAzVM.ps1` is now testable (#6): the per-disk SKU decision logic was
   extracted into a pure `Get-DiskSkuUpdatePlan` helper (used by the parallel block),
   and a dot-source guard (`$MyInvocation.InvocationName -eq '.'`) prevents the

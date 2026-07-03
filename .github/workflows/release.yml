@@ -15,7 +15,7 @@ jobs:
       # Checkout code
       - name: Checkout code
         id: checkout_code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       # Create a ZIP file with project name and tag version
       - name: Create ZIP file of lab (terraform + scripts)
         run: |
