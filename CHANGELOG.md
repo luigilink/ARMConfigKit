@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `scripts/StartAzVM.ps1` is now clean under PSScriptAnalyzer (#4): `Set-DiskSku`
+  uses `[CmdletBinding(SupportsShouldProcess)]` with `$PSCmdlet.ShouldProcess`
+  instead of a hand-rolled `-WhatIf` switch, `Get-VMDisks` was renamed to the
+  singular `Get-VMDisk`, and the file is saved as UTF-8 with BOM. A tracked
+  `PSScriptAnalyzerSettings.psd1` documents the single intentional exclusion
+  (`PSAvoidUsingWriteHost`, since the script is an interactive colour-coded tool).
 - `scripts/StartAzVM.ps1` is now safe to run unattended (#4):
   - The `az vm list` call is validated — a non-zero az exit code (expired login,
     wrong/empty resource group, missing permissions) now fails loudly with
