@@ -79,9 +79,59 @@ function Get-VMDisk {
     }
 }
 
+function Get-DiskSkuUpdatePlan {
+    <#
+      Decide, for a set of disk IDs, which ones need their SKU changed to the
+      target. Pure decision function (the SKU lookup is injected) so it can be
+      unit-tested without calling Azure.
+
+      Returns an object:
+      @{
+        Updates     = @( @{ DiskId; CurrentSku; NewSku } ... )  # disks to change
+        FailedReads = @( <diskId> ... )                         # SKU unreadable
+      }
+    #>
+    param(
+        [string[]]$DiskId,
+        [string]$TargetSku,
+        # Function that returns the current SKU for a disk id (injected so tests
+        # can supply a stub instead of calling az).
+        [scriptblock]$SkuReader = { param($id) Get-DiskSku -DiskId $id }
+    )
+
+    $updates = @()
+    $failedReads = @()
+    foreach ($id in $DiskId) {
+        $currentSku = & $SkuReader $id
+        if (-not $currentSku) {
+            $failedReads += $id
+            continue
+        }
+        if ($currentSku -eq "UltraSSD_LRS") {
+            continue
+        }
+        if ($currentSku -ne $TargetSku) {
+            $updates += [pscustomobject]@{
+                DiskId     = $id
+                CurrentSku = $currentSku
+                NewSku     = $TargetSku
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        Updates     = $updates
+        FailedReads = $failedReads
+    }
+}
+
 # =======================
 # Main
 # =======================
+# When the script is dot-sourced (e.g. by the Pester tests) only the functions
+# above are loaded; the remediation below must not run.
+if ($MyInvocation.InvocationName -eq '.') { return }
+
 Write-Host "Listing VMs in resource group '$resourceGroup'..." -ForegroundColor Cyan
 
 # Capture raw output and validate the az call before parsing: a non-zero exit
@@ -111,9 +161,10 @@ if (-not $vmList -or $vmList.Count -eq 0) {
 # parallel runspace — functions from the parent scope are NOT inherited by
 # ForEach-Object -Parallel. This keeps a single source of truth (the functions
 # defined above) rather than duplicating their bodies.
-$getDiskSkuDef = ${function:Get-DiskSku}.ToString()
-$setDiskSkuDef = ${function:Set-DiskSku}.ToString()
-$getVMDisksDef = ${function:Get-VMDisk}.ToString()
+$getDiskSkuDef  = ${function:Get-DiskSku}.ToString()
+$setDiskSkuDef  = ${function:Set-DiskSku}.ToString()
+$getVMDisksDef  = ${function:Get-VMDisk}.ToString()
+$getPlanDef     = ${function:Get-DiskSkuUpdatePlan}.ToString()
 
 $results = $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
     # ---- Re-hydrate the parent scope -------------------------------------
@@ -130,6 +181,7 @@ $results = $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
     ${function:Get-DiskSku} = $using:getDiskSkuDef
     ${function:Set-DiskSku} = $using:setDiskSkuDef
     ${function:Get-VMDisk} = $using:getVMDisksDef
+    ${function:Get-DiskSkuUpdatePlan} = $using:getPlanDef
 
     $vm     = $_
     $vmName = $vm.name
@@ -171,35 +223,18 @@ $results = $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
         return $result
     }
 
-    # Identify which disks actually need changes
-    $updates = @()
-    foreach ($diskId in $diskIds) {
-        $currentSku = Get-DiskSku -DiskId $diskId
-        if (-not $currentSku) {
-            Write-Host "[$vmName]   Could not read SKU for disk: $diskId — skipping." -ForegroundColor Yellow
-            $result.Failed++
-            continue
-        }
+    # Identify which disks actually need changes (pure decision, unit-tested)
+    $plan = Get-DiskSkuUpdatePlan -DiskId $diskIds -TargetSku $targetSku
+    $updates = @($plan.Updates)
 
-        if ($currentSku -eq "UltraSSD_LRS") {
-            Write-Host "[$vmName]   Disk $diskId is UltraSSD — skipping (different semantics)." -ForegroundColor Yellow
-            continue
-        }
-
-        if ($currentSku -ne $targetSku) {
-            $updates += [pscustomobject]@{
-                DiskId     = $diskId
-                CurrentSku = $currentSku
-                NewSku     = $targetSku
-            }
-        } else {
-            Write-Host "[$vmName]   Disk $diskId already $targetSku" -ForegroundColor DarkGray
-        }
+    foreach ($failedId in $plan.FailedReads) {
+        Write-Host "[$vmName]   Could not read SKU for disk: $failedId — skipping." -ForegroundColor Yellow
+        $result.Failed++
     }
 
     if ($updates.Count -eq 0) {
         if ($result.Failed -eq 0) {
-            Write-Host "[$vmName] All disks already at $targetSku." -ForegroundColor Green
+            Write-Host "[$vmName] All disks already at $targetSku (or skipped)." -ForegroundColor Green
         }
         return $result
     }
