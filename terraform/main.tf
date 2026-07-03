@@ -49,9 +49,11 @@ locals {
   enable_telemetry           = true
   license_type               = "Windows_Server"
   create_rdp_rule            = lower(var.rdp_traffic_rule) == "no" ? false : true
-  # Availability zones: empty/null when zonal placement is disabled (default),
-  # so VMs, their public IPs and the Bastion deploy non-zonal.
-  availability_zones = var.enable_availability_zones ? ["1", "2", "3"] : null
+  # Availability zones: empty list when zonal placement is disabled (default), so
+  # VMs, their public IPs and the Bastion deploy non-zonal. Passing an empty list
+  # (not null) is required because the VM module's public_ip zones field is
+  # optional and treats null as "use the default [1,2,3]".
+  availability_zones = var.enable_availability_zones ? ["1", "2", "3"] : []
   vm_zone            = var.enable_availability_zones ? one(random_integer.zone_index[*].result) : null
   network_settings = {
     vNetPrivatePrefix   = "10.1.0.0/16"
@@ -279,7 +281,7 @@ module "azure_bastion" {
   tags                = local.tags
   enable_telemetry    = local.enable_telemetry
   sku                 = "Basic"
-  zones               = local.availability_zones != null ? local.availability_zones : []
+  zones               = local.availability_zones
   ip_configuration = {
     name                 = "IpConf"
     subnet_id            = module.vnet.subnets["AzureBastionSubnet"].resource_id
