@@ -42,10 +42,10 @@ provider "azurerm" {
 }
 
 locals {
-  az_resource_group_name     = "RG-SPSE-SmallFarm"
+  az_resource_group_name     = var.resource_group_name
   az_resource_short_name     = "rgspsmfarm"
   resourceGroupNameFormatted = replace(replace(replace(replace(local.az_resource_group_name, ".", "-"), "(", "-"), ")", "-"), "_", "-")
-  az_resource_group_location = "France Central"
+  az_resource_group_location = var.location
   enable_telemetry           = true
   license_type               = "Windows_Server"
   create_rdp_rule            = lower(var.rdp_traffic_rule) == "no" ? false : true

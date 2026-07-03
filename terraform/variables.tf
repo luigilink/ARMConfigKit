@@ -1,5 +1,5 @@
 variable "resource_group_name" {
-  default     = "rg-sps-se"
+  default     = "RG-SPSE-SmallFarm"
   description = "Name of the resource group to create and/or use for this deployment."
 }
 
