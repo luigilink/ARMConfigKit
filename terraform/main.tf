@@ -49,6 +49,10 @@ locals {
   enable_telemetry           = true
   license_type               = "Windows_Server"
   create_rdp_rule            = lower(var.rdp_traffic_rule) == "no" ? false : true
+  # Availability zones: empty/null when zonal placement is disabled (default),
+  # so VMs, their public IPs and the Bastion deploy non-zonal.
+  availability_zones = var.enable_availability_zones ? ["1", "2", "3"] : null
+  vm_zone            = var.enable_availability_zones ? one(random_integer.zone_index[*].result) : null
   network_settings = {
     vNetPrivatePrefix   = "10.1.0.0/16"
     mainSubnetPrefix    = "10.1.1.0/24"
@@ -77,8 +81,9 @@ module "regions" {
   enable_telemetry = local.enable_telemetry
 }
 resource "random_integer" "zone_index" {
-  max = length(module.regions.regions_by_name[var.location].zones)
-  min = 1
+  count = var.enable_availability_zones ? 1 : 0
+  max   = length(module.regions.regions_by_name[var.location].zones)
+  min   = 1
 }
 
 # Create a resource group
@@ -124,7 +129,7 @@ resource "azurerm_public_ip" "bastion_pip" {
   allocation_method   = "Static"
   sku                 = "Standard"
   tags                = {}
-  zones               = ["1", "2", "3"]
+  zones               = local.availability_zones
 }
 
 # Create Network security group
@@ -159,8 +164,9 @@ module "vm" {
   source  = "Azure/avm-res-compute-virtualmachine/azurerm"
   version = "0.20.0"
 
-  # Zone: reuse your existing random value or make it per-VM later
-  zone = random_integer.zone_index.result
+  # Zone: single availability zone when zonal placement is enabled, otherwise null
+  # (Azure places the VM without a zone, avoiding single-zone capacity restrictions).
+  zone = local.vm_zone
 
   # Basic identity
   name                = each.value.name
@@ -203,7 +209,7 @@ module "vm" {
   # Only configure the domain name label if the user has chosen to add a name to public IP addresses, otherwise set it to null to avoid errors since the public IP won't be created. The domain name label must be unique across Azure, so we use the resource group name and VM name to try to ensure uniqueness.
   public_ip_configuration_details = {
     domain_name_label = lower(trimspace(var.add_name_to_public_ip_addresses)) == "yes" ? "${lower(local.resourceGroupNameFormatted)}-${lower(each.value.name)}" : null
-    zones             = ["1", "2", "3"]
+    zones             = local.availability_zones
   }
   # Account credentials: the admin username/password are required user-provided
   # inputs (no password is generated). generate_admin_password_or_ssh_key is false
@@ -273,7 +279,7 @@ module "azure_bastion" {
   tags                = local.tags
   enable_telemetry    = local.enable_telemetry
   sku                 = "Basic"
-  zones               = ["1", "2", "3"]
+  zones               = local.availability_zones != null ? local.availability_zones : []
   ip_configuration = {
     name                 = "IpConf"
     subnet_id            = module.vnet.subnets["AzureBastionSubnet"].resource_id

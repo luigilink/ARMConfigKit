@@ -18,14 +18,26 @@ defaults** and must be supplied through `terraform.tfvars` (git-ignored). A trac
 
 ## Common optional variables
 
-| Variable                | Default              | Description                                  |
-| ----------------------- | -------------------- | -------------------------------------------- |
-| `resource_group_name`   | `rg-sps-se`          | Resource group to create/use.                |
-| `location`              | `francecentral`      | Azure region.                                |
-| `adds_fqdn`             | `contoso.com`        | Active Directory domain FQDN.                |
-| `sharepoint_version`    | `Subscription-Latest`| SharePoint farm version.                     |
-| `enable_azure_bastion`  | `true`               | Provision Azure Bastion.                     |
-| `auto_shutdown_time`    | `2000`               | Auto-shutdown time (HHmm), `9999` to disable.|
+| Variable                    | Default              | Description                                  |
+| --------------------------- | -------------------- | -------------------------------------------- |
+| `resource_group_name`       | `RG-SPSE-SmallFarm`  | Resource group to create/use.                |
+| `location`                  | `francecentral`      | Azure region.                                |
+| `adds_fqdn`                 | `contoso.com`        | Active Directory domain FQDN.                |
+| `sharepoint_version`        | `Subscription-Latest`| SharePoint farm version.                     |
+| `enable_azure_bastion`      | `true`               | Provision Azure Bastion.                     |
+| `enable_availability_zones` | `false`              | Pin VMs/PIPs/Bastion to zones 1/2/3.         |
+| `auto_shutdown_time`        | `2000`               | Auto-shutdown time (HHmm), `9999` to disable.|
+
+## Availability zones
+
+By default (`enable_availability_zones = false`) the VMs, their public IPs and the
+Azure Bastion are deployed **non-zonal**. This is the recommended lab setting: it
+avoids single-zone capacity restrictions (`SkuNotAvailable`) and works in regions
+that do not support a zonal Azure Bastion (e.g. France Central).
+
+Set `enable_availability_zones = true` only in a region that supports availability
+zones **and** a zonal Bastion (e.g. West Europe). When enabled, the VMs use a single
+random zone and the public IPs / Bastion span zones 1/2/3.
 
 ## Auto-shutdown
 

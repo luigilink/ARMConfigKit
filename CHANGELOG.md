@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `enable_availability_zones` variable (default `false`) to control zonal placement
+  of the VMs, their public IPs and the Azure Bastion (#14). Non-zonal by default,
+  which avoids single-zone capacity restrictions (`SkuNotAvailable`) and works in
+  regions without a zonal Bastion (e.g. France Central). Set to `true` in a region
+  that supports zones and a zonal Bastion (e.g. West Europe) for zonal placement.
 - `terraform/outputs.tf` exposing the resource group name and location, the admin
   username, a map of each VM to its private IP, the VM resource IDs, and the Azure
   Bastion host name (#12).
