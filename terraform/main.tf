@@ -81,17 +81,6 @@ resource "random_integer" "zone_index" {
   min = 1
 }
 
-# Create a random password for the Active Directory Domain Services Server
-resource "random_password" "random_admin_password" {
-  length           = 8
-  special          = true
-  override_special = "!#$%*()-_=+[]{}:?" # Do not include special characters '&<>' because they get encoded in the result
-  min_lower        = 1
-  min_numeric      = 1
-  min_upper        = 1
-  min_special      = 1
-}
-
 # Create a resource group
 resource "azurerm_resource_group" "rg" {
   name     = local.az_resource_group_name
@@ -195,10 +184,6 @@ module "vm" {
   secure_boot_enabled        = true
   vtpm_enabled               = true
 
-  # Credentials
-  admin_username = var.adds_domain_admin_username
-  admin_password = var.adds_domain_admin_password == "" ? random_password.random_admin_password.result : var.adds_domain_admin_password
-
   # Timezone
   timezone = var.az_time_zone
 
@@ -226,7 +211,9 @@ module "vm" {
     domain_name_label = lower(trimspace(var.add_name_to_public_ip_addresses)) == "yes" ? "${lower(local.resourceGroupNameFormatted)}-${lower(each.value.name)}" : null
     zones             = ["1", "2", "3"]
   }
-  # Account credentials: use provided password or generated one, and specify that we don't want to generate an SSH key since this is a Windows VM and SSH keys are not supported for Windows authentication
+  # Account credentials: the admin username/password are required user-provided
+  # inputs (no password is generated). generate_admin_password_or_ssh_key is false
+  # because the password is always supplied. SSH keys are not used (Windows).
   account_credentials = {
     admin_credentials = {
       username                           = var.adds_domain_admin_username
