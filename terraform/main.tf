@@ -43,7 +43,7 @@ provider "azurerm" {
 
 locals {
   az_resource_group_name     = var.resource_group_name
-  az_resource_short_name     = "rgspsmfarm"
+  az_resource_short_name     = var.resource_short_name != "" ? var.resource_short_name : substr(lower(replace(var.resource_group_name, "/[^a-zA-Z0-9]/", "")), 0, 12)
   resourceGroupNameFormatted = replace(replace(replace(replace(local.az_resource_group_name, ".", "-"), "(", "-"), ")", "-"), "_", "-")
   az_resource_group_location = var.location
   enable_telemetry           = true

@@ -21,12 +21,22 @@ defaults** and must be supplied through `terraform.tfvars` (git-ignored). A trac
 | Variable                    | Default              | Description                                  |
 | --------------------------- | -------------------- | -------------------------------------------- |
 | `resource_group_name`       | `RG-SPSE-SmallFarm`  | Resource group to create/use.                |
+| `resource_short_name`       | `""` (derived)       | Prefix for resource names; empty = derived from the RG name. |
 | `location`                  | `eastus`             | Azure region.                                |
 | `adds_fqdn`                 | `contoso.com`        | Active Directory domain FQDN.                |
 | `sharepoint_version`        | `Subscription-Latest`| SharePoint farm version.                     |
 | `enable_azure_bastion`      | `true`               | Provision Azure Bastion.                     |
 | `enable_availability_zones` | `false`              | Pin VMs/PIPs/Bastion to zones 1/2/3.         |
 | `auto_shutdown_time`        | `2000`               | Auto-shutdown time (HHmm), `9999` to disable.|
+
+## Resource naming
+
+Resources are named `<short_name>-<role>` (e.g. `armconfigkit-VNET`,
+`armconfigkit-PDC1-NIC1`). By default `resource_short_name` is empty and the prefix
+is **derived from `resource_group_name`** — lowercased, non-alphanumeric characters
+removed, truncated to 12 characters (so `ARMConfigKit` → `armconfigkit`,
+`RG-SPSE-SmallFarm` → `rgspsesmallf`). Set `resource_short_name` explicitly to use a
+custom short prefix (e.g. `armck`).
 
 ## Availability zones
 

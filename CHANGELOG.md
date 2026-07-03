@@ -5,6 +5,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Derive the resource name prefix from `resource_group_name` instead of the
+  hardcoded `rgspsmfarm` (#18). New optional `resource_short_name` variable: when
+  empty (default) the prefix is derived from the RG name (lowercased, alphanumerics
+  only, truncated to 12 chars — e.g. `ARMConfigKit` → `armconfigkit`); set it for a
+  custom short prefix. Resource names now track the resource group.
+
 ### Fixed
 
 - Only create the Bastion public IP (`azurerm_public_ip.bastion_pip`) and the

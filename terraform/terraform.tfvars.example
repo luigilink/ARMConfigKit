@@ -26,6 +26,10 @@ adds_domain_admin_password = "ChangeMe-Str0ng!Passw0rd"
 # --- Common optional overrides ----------------------------------------------
 
 # resource_group_name = "RG-SPSE-SmallFarm"
+# Prefix for resource names. Leave empty/unset to derive it from resource_group_name
+# (lowercased, alphanumerics only, truncated to 12 chars). Set a value for a custom
+# short prefix, e.g. "armck" -> armck-VNET.
+# resource_short_name = "armck"
 # adds_fqdn           = "contoso.com"
 # sharepoint_version  = "Subscription-Latest"
 
