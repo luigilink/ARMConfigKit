@@ -104,27 +104,33 @@ module "vnet" {
   tags             = local.tags
   enable_telemetry = local.enable_telemetry
   address_space    = [local.network_settings.vNetPrivatePrefix]
-  subnets = {
-    vm_subnet_1 = {
-      name                            = "${local.az_resource_short_name}-VNET-Subnet1"
-      address_prefixes                = [local.network_settings.mainSubnetPrefix]
-      default_outbound_access_enabled = false
-      network_security_group = {
-        id = module.nsg_subnet_main.resource_id
+  subnets = merge(
+    {
+      vm_subnet_1 = {
+        name                            = "${local.az_resource_short_name}-VNET-Subnet1"
+        address_prefixes                = [local.network_settings.mainSubnetPrefix]
+        default_outbound_access_enabled = false
+        network_security_group = {
+          id = module.nsg_subnet_main.resource_id
+        }
       }
-    }
-    "AzureBastionSubnet" = {
-      name                            = "AzureBastionSubnet"
-      address_prefixes                = [local.network_settings.bastionSubnetPrefix]
-      default_outbound_access_enabled = false
-    }
-  }
+    },
+    # The AzureBastionSubnet is only needed when Azure Bastion is provisioned.
+    var.enable_azure_bastion ? {
+      "AzureBastionSubnet" = {
+        name                            = "AzureBastionSubnet"
+        address_prefixes                = [local.network_settings.bastionSubnetPrefix]
+        default_outbound_access_enabled = false
+      }
+    } : {}
+  )
   depends_on = [
     azurerm_resource_group.rg
   ]
 }
-# Create a public IP address for Azure Bastion
+# Create a public IP address for Azure Bastion (only when Bastion is enabled)
 resource "azurerm_public_ip" "bastion_pip" {
+  count               = var.enable_azure_bastion ? 1 : 0
   name                = "${local.az_resource_short_name}-VNET-IPv4"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
@@ -285,7 +291,7 @@ module "azure_bastion" {
   ip_configuration = {
     name                 = "IpConf"
     subnet_id            = module.vnet.subnets["AzureBastionSubnet"].resource_id
-    public_ip_address_id = azurerm_public_ip.bastion_pip.id
+    public_ip_address_id = azurerm_public_ip.bastion_pip[0].id
     create_public_ip     = false
   }
 }

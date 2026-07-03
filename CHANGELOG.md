@@ -5,6 +5,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Only create the Bastion public IP (`azurerm_public_ip.bastion_pip`) and the
+  `AzureBastionSubnet` when `enable_azure_bastion` is true (#16). Previously both were
+  created even with Bastion disabled, leaving orphaned resources.
+
 ### Changed
 
 - Change the default `location` from `francecentral` to `eastus` (#14): the MCAPS
