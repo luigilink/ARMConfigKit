@@ -85,9 +85,6 @@ resource "random_integer" "zone_index" {
 resource "azurerm_resource_group" "rg" {
   name     = local.az_resource_group_name
   location = local.az_resource_group_location
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 # Create virtual network
