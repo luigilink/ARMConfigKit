@@ -1,5 +1,8 @@
 # Requires: Azure CLI installed and logged in (az login)
+# Requires: PowerShell 7+ (uses ForEach-Object -Parallel)
 # Scope: Update all managed disks (OS + data) on each VM in a resource group to StandardSSD_LRS
+#        The VMs are processed in parallel to speed up a full remediation pass.
+#Requires -Version 7.0
 
 # =======================
 # User parameters
@@ -9,6 +12,7 @@ $targetSku     = "StandardSSD_LRS"   # other valid values: Standard_LRS, Premium
 $deallocateVM  = $true               # safer path for OS/data disk SKU changes
 $whatIf        = $false              # dry-run first; set $false to execute changes
 $startAfter    = $true               # start VM again if we deallocated it
+$throttleLimit = 5                   # max number of VMs processed concurrently
 
 # =======================
 # Helpers
@@ -86,7 +90,31 @@ if (-not $vmList -or $vmList.Count -eq 0) {
     return
 }
 
-foreach ($vm in $vmList) {
+# Capture the helper definitions once so they can be re-created inside each
+# parallel runspace — functions from the parent scope are NOT inherited by
+# ForEach-Object -Parallel. This keeps a single source of truth (the functions
+# defined above) rather than duplicating their bodies.
+$getDiskSkuDef = ${function:Get-DiskSku}.ToString()
+$setDiskSkuDef = ${function:Set-DiskSku}.ToString()
+$getVMDisksDef = ${function:Get-VMDisks}.ToString()
+
+$vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
+    # ---- Re-hydrate the parent scope -------------------------------------
+    # Variables from the parent scope are not visible here, so bring across
+    # everything this block needs via $using:.
+    $resourceGroup = $using:resourceGroup
+    $targetSku     = $using:targetSku
+    $deallocateVM  = $using:deallocateVM
+    $whatIf        = $using:whatIf
+    $startAfter    = $using:startAfter
+
+    # Re-create the helper functions inside this runspace from the captured
+    # definitions.
+    ${function:Get-DiskSku} = $using:getDiskSkuDef
+    ${function:Set-DiskSku} = $using:setDiskSkuDef
+    ${function:Get-VMDisks} = $using:getVMDisksDef
+
+    $vm     = $_
     $vmName = $vm.name
     Write-Host "`n===== VM: $vmName =====" -ForegroundColor Cyan
 
@@ -96,23 +124,23 @@ foreach ($vm in $vmList) {
     $diskIds = @()
 
     if ($vmDisks.EphemeralOs) {
-        Write-Host "OS disk is Ephemeral for '$vmName' — skip OS disk SKU change." -ForegroundColor Yellow
+        Write-Host "[$vmName] OS disk is Ephemeral — skip OS disk SKU change." -ForegroundColor Yellow
     }
     else {
         if ($vmDisks.OsDiskId) { $diskIds += $vmDisks.OsDiskId }
-        else { Write-Host "No managed OS disk ID detected on '$vmName'." -ForegroundColor Yellow }
+        else { Write-Host "[$vmName] No managed OS disk ID detected." -ForegroundColor Yellow }
     }
 
     if ($vmDisks.DataDiskIds -and $vmDisks.DataDiskIds.Count -gt 0) {
         $diskIds += $vmDisks.DataDiskIds
     }
     else {
-        Write-Host "No managed data disks on '$vmName'." -ForegroundColor DarkGray
+        Write-Host "[$vmName] No managed data disks." -ForegroundColor DarkGray
     }
 
     if ($diskIds.Count -eq 0) {
-        Write-Host "Nothing to do for '$vmName'." -ForegroundColor DarkGray
-        continue
+        Write-Host "[$vmName] Nothing to do." -ForegroundColor DarkGray
+        return
     }
 
     # Identify which disks actually need changes
@@ -120,12 +148,12 @@ foreach ($vm in $vmList) {
     foreach ($diskId in $diskIds) {
         $currentSku = Get-DiskSku -DiskId $diskId
         if (-not $currentSku) {
-            Write-Host "  Could not read SKU for disk: $diskId — skipping." -ForegroundColor Yellow
+            Write-Host "[$vmName]   Could not read SKU for disk: $diskId — skipping." -ForegroundColor Yellow
             continue
         }
 
         if ($currentSku -eq "UltraSSD_LRS") {
-            Write-Host "  Disk $diskId is UltraSSD — skipping (different semantics)." -ForegroundColor Yellow
+            Write-Host "[$vmName]   Disk $diskId is UltraSSD — skipping (different semantics)." -ForegroundColor Yellow
             continue
         }
 
@@ -136,27 +164,27 @@ foreach ($vm in $vmList) {
                 NewSku     = $targetSku
             }
         } else {
-            Write-Host "  Disk $diskId already $targetSku" -ForegroundColor DarkGray
+            Write-Host "[$vmName]   Disk $diskId already $targetSku" -ForegroundColor DarkGray
         }
     }
 
     if ($updates.Count -eq 0) {
-        Write-Host "All disks on '$vmName' already at $targetSku." -ForegroundColor Green
-        continue
+        Write-Host "[$vmName] All disks already at $targetSku." -ForegroundColor Green
+        return
     }
 
     # Deallocate (safer for OS and data disk SKU transitions)
     $wasDeallocated = $false
     if ($deallocateVM) {
         if ($whatIf) {
-            Write-Host "[WhatIf] Would deallocate VM '$vmName' before updates." -ForegroundColor Yellow
+            Write-Host "[$vmName] [WhatIf] Would deallocate VM before updates." -ForegroundColor Yellow
             $wasDeallocated = $true
         } else {
-            Write-Host "Deallocating VM '$vmName'..." -ForegroundColor Magenta
+            Write-Host "[$vmName] Deallocating VM..." -ForegroundColor Magenta
             az vm deallocate -g $resourceGroup -n $vmName --only-show-errors | Out-Null
             if ($LASTEXITCODE -ne 0) {
-                Write-Host "Failed to deallocate '$vmName'. Skipping this VM." -ForegroundColor Red
-                continue
+                Write-Host "[$vmName] Failed to deallocate. Skipping this VM." -ForegroundColor Red
+                return
             }
             $wasDeallocated = $true
         }
@@ -164,22 +192,22 @@ foreach ($vm in $vmList) {
 
     # Apply disk SKU updates
     foreach ($item in $updates) {
-        Write-Host ("Updating disk SKU: {0}`n    Current: {1}`n    Target : {2}" -f $item.DiskId, $item.CurrentSku, $item.NewSku) -ForegroundColor Cyan
+        Write-Host ("[$vmName] Updating disk SKU: {0}`n    Current: {1}`n    Target : {2}" -f $item.DiskId, $item.CurrentSku, $item.NewSku) -ForegroundColor Cyan
         $ok = Set-DiskSku -DiskId $item.DiskId -NewSku $item.NewSku -WhatIf:$whatIf
         if (-not $ok) {
-            Write-Host "  Update failed for $($item.DiskId)." -ForegroundColor Red
+            Write-Host "[$vmName]   Update failed for $($item.DiskId)." -ForegroundColor Red
         }
     }
 
     # Start VM back if we deallocated it
     if ($wasDeallocated -and $startAfter) {
         if ($whatIf) {
-            Write-Host "[WhatIf] Would start VM '$vmName' after updates." -ForegroundColor Yellow
+            Write-Host "[$vmName] [WhatIf] Would start VM after updates." -ForegroundColor Yellow
         } else {
-            Write-Host "Starting VM '$vmName'..." -ForegroundColor Magenta
+            Write-Host "[$vmName] Starting VM..." -ForegroundColor Magenta
             az vm start -g $resourceGroup -n $vmName --only-show-errors | Out-Null
             if ($LASTEXITCODE -ne 0) {
-                Write-Host "Failed to start VM '$vmName'. Please check the portal/CLI." -ForegroundColor Red
+                Write-Host "[$vmName] Failed to start VM. Please check the portal/CLI." -ForegroundColor Red
             }
         }
     }
