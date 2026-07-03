@@ -19,18 +19,26 @@ variable "adds_domain_netbios_name" {
 }
 
 variable "adds_domain_admin_username" {
-  default     = ""
-  description = "Username of the Active Directory domain administrator."
+  type        = string
+  description = "Username of the Active Directory domain administrator. Required — you must provide your own value."
   validation {
-    condition     = !contains(["admin", "administrator"], var.adds_domain_admin_username)
-    error_message = "adminn and administrator are reserved words and cannot be used as the domain administrator username."
+    condition     = !contains(["admin", "administrator"], lower(var.adds_domain_admin_username))
+    error_message = "admin and administrator are reserved words and cannot be used as the domain administrator username."
+  }
+  validation {
+    condition     = length(var.adds_domain_admin_username) >= 1 && length(var.adds_domain_admin_username) <= 20
+    error_message = "adds_domain_admin_username must be between 1 and 20 characters (Windows admin username limit)."
   }
 }
 
 variable "adds_domain_admin_password" {
-  default     = ""
-  description = "Password of the Active Directory domain administrator. Leave empty to generate a random password."
+  type        = string
+  description = "Password of the Active Directory domain administrator. Required — you must provide your own value (no password is generated). Azure requires a Windows admin password of 12-123 characters with complexity."
   sensitive   = true
+  validation {
+    condition     = length(var.adds_domain_admin_password) >= 12 && length(var.adds_domain_admin_password) <= 123
+    error_message = "adds_domain_admin_password must be between 12 and 123 characters (Azure Windows VM requirement)."
+  }
 }
 
 variable "location" {
