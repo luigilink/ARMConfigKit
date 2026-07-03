@@ -44,7 +44,7 @@ variable "adds_domain_admin_password" {
 variable "location" {
   type        = string
   default     = "francecentral"
-  description = "The Azure region where this and supporting resources should be deployed."
+  description = "The Azure region for the whole lab. The resource group is created in this region and every other resource inherits the resource group's location, so this single value places the entire farm. Choose a region with capacity for the VM sizes used."
   nullable    = false
 }
 
@@ -276,6 +276,20 @@ variable "enable_azure_bastion" {
   type        = bool
   default     = true
   description = "Specify if Azure Bastion Basic should be provisioned. See https://azure.microsoft.com/en-us/services/azure-bastion for more information."
+}
+
+variable "enable_availability_zones" {
+  type        = bool
+  default     = false
+  description = <<EOF
+    Specify if the virtual machines, their public IPs and the Azure Bastion should be
+    pinned to availability zones (1, 2, 3).
+    - false (default): resources are deployed non-zonal. This avoids single-zone
+      capacity restrictions (SkuNotAvailable) and works in regions that do not
+      support a zonal Azure Bastion. Recommended for a lab.
+    - true: resources are spread across zones 1/2/3 (VMs use a single random zone).
+      Only use this in regions that support availability zones AND a zonal Bastion.
+  EOF
 }
 
 variable "auto_shutdown_time" {
