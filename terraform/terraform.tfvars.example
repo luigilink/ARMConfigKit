@@ -13,7 +13,7 @@ arm_subscription_id = "00000000-0000-0000-0000-000000000000"
 
 # Active Directory domain administrator credentials.
 adds_domain_admin_username = "labadmin"
-# Leave empty ("") to let Terraform generate a random password instead.
+# Required. Azure Windows password rules: 12-123 characters with complexity.
 adds_domain_admin_password = "ChangeMe-Str0ng!Passw0rd"
 
 # --- Common optional overrides ----------------------------------------------
