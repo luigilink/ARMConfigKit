@@ -10,7 +10,7 @@
 $resourceGroup = "RG-SPSE-SmallFarm" # <<< replace if needed
 $targetSku     = "StandardSSD_LRS"   # other valid values: Standard_LRS, Premium_LRS, PremiumV2_LRS (region support applies)
 $deallocateVM  = $true               # safer path for OS/data disk SKU changes
-$whatIf        = $false              # dry-run first; set $false to execute changes
+$whatIf        = $true               # dry-run by default; set to $false to execute changes
 $startAfter    = $true               # start VM again if we deallocated it
 $throttleLimit = 5                   # max number of VMs processed concurrently
 
@@ -83,7 +83,24 @@ function Get-VMDisks {
 # Main
 # =======================
 Write-Host "Listing VMs in resource group '$resourceGroup'..." -ForegroundColor Cyan
-$vmList = az vm list -g $resourceGroup --output json | ConvertFrom-Json
+
+# Capture raw output and validate the az call before parsing: a non-zero exit
+# code (expired login, wrong/empty resource group, missing permissions) must be
+# surfaced as an error, not silently masked as "no VMs". Invalid/partial JSON
+# would otherwise make ConvertFrom-Json throw an unhandled terminating error.
+$vmListRaw = az vm list -g $resourceGroup --output json 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to list VMs in resource group '$resourceGroup' (az exit code $LASTEXITCODE). Check 'az login', the resource group name and your permissions." -ForegroundColor Red
+    exit 1
+}
+
+try {
+    $vmList = ($vmListRaw -join "`n") | ConvertFrom-Json -ErrorAction Stop
+}
+catch {
+    Write-Host "Failed to parse the VM list returned by az: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
 
 if (-not $vmList -or $vmList.Count -eq 0) {
     Write-Host "No VMs found in resource group '$resourceGroup'." -ForegroundColor Yellow
@@ -98,7 +115,7 @@ $getDiskSkuDef = ${function:Get-DiskSku}.ToString()
 $setDiskSkuDef = ${function:Set-DiskSku}.ToString()
 $getVMDisksDef = ${function:Get-VMDisks}.ToString()
 
-$vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
+$results = $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
     # ---- Re-hydrate the parent scope -------------------------------------
     # Variables from the parent scope are not visible here, so bring across
     # everything this block needs via $using:.
@@ -116,6 +133,17 @@ $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
 
     $vm     = $_
     $vmName = $vm.name
+
+    # Per-VM result object emitted to the pipeline so the caller can report a
+    # summary and set a meaningful exit code. Every code path below returns this.
+    $result = [pscustomobject]@{
+        VmName           = $vmName
+        Updated          = 0
+        Failed           = 0
+        DeallocateFailed = $false
+        StillDeallocated = $false
+    }
+
     Write-Host "`n===== VM: $vmName =====" -ForegroundColor Cyan
 
     $vmDisks = Get-VMDisks -VmJson $vm
@@ -140,7 +168,7 @@ $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
 
     if ($diskIds.Count -eq 0) {
         Write-Host "[$vmName] Nothing to do." -ForegroundColor DarkGray
-        return
+        return $result
     }
 
     # Identify which disks actually need changes
@@ -149,6 +177,7 @@ $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
         $currentSku = Get-DiskSku -DiskId $diskId
         if (-not $currentSku) {
             Write-Host "[$vmName]   Could not read SKU for disk: $diskId — skipping." -ForegroundColor Yellow
+            $result.Failed++
             continue
         }
 
@@ -169,8 +198,10 @@ $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
     }
 
     if ($updates.Count -eq 0) {
-        Write-Host "[$vmName] All disks already at $targetSku." -ForegroundColor Green
-        return
+        if ($result.Failed -eq 0) {
+            Write-Host "[$vmName] All disks already at $targetSku." -ForegroundColor Green
+        }
+        return $result
     }
 
     # Deallocate (safer for OS and data disk SKU transitions)
@@ -184,7 +215,9 @@ $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
             az vm deallocate -g $resourceGroup -n $vmName --only-show-errors | Out-Null
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "[$vmName] Failed to deallocate. Skipping this VM." -ForegroundColor Red
-                return
+                $result.DeallocateFailed = $true
+                $result.Failed++
+                return $result
             }
             $wasDeallocated = $true
         }
@@ -194,8 +227,11 @@ $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
     foreach ($item in $updates) {
         Write-Host ("[$vmName] Updating disk SKU: {0}`n    Current: {1}`n    Target : {2}" -f $item.DiskId, $item.CurrentSku, $item.NewSku) -ForegroundColor Cyan
         $ok = Set-DiskSku -DiskId $item.DiskId -NewSku $item.NewSku -WhatIf:$whatIf
-        if (-not $ok) {
+        if ($ok) {
+            $result.Updated++
+        } else {
             Write-Host "[$vmName]   Update failed for $($item.DiskId)." -ForegroundColor Red
+            $result.Failed++
         }
     }
 
@@ -208,9 +244,34 @@ $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
             az vm start -g $resourceGroup -n $vmName --only-show-errors | Out-Null
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "[$vmName] Failed to start VM. Please check the portal/CLI." -ForegroundColor Red
+                $result.StillDeallocated = $true
+                $result.Failed++
             }
         }
     }
+
+    return $result
 }
 
-Write-Host "`nDone." -ForegroundColor Green
+# =======================
+# Summary
+# =======================
+Write-Host "`n===== Summary =====" -ForegroundColor Cyan
+$results |
+    Sort-Object VmName |
+    Format-Table VmName, Updated, Failed, DeallocateFailed, StillDeallocated -AutoSize |
+    Out-Host
+
+$failedVms = @($results | Where-Object { $_.Failed -gt 0 -or $_.StillDeallocated -or $_.DeallocateFailed })
+if ($failedVms.Count -gt 0) {
+    $names = ($failedVms | ForEach-Object { $_.VmName }) -join ", "
+    Write-Host "Completed with errors on: $names" -ForegroundColor Red
+    $stuck = @($results | Where-Object { $_.StillDeallocated })
+    if ($stuck.Count -gt 0) {
+        $stuckNames = ($stuck | ForEach-Object { $_.VmName }) -join ", "
+        Write-Host "WARNING: the following VMs were deallocated but could not be started again: $stuckNames" -ForegroundColor Red
+    }
+    exit 1
+}
+
+Write-Host "Done." -ForegroundColor Green
