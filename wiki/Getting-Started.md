@@ -44,6 +44,20 @@ terraform plan
 terraform apply
 ```
 
+> **Tip — fresh or capacity-constrained subscriptions.** Applying the full farm
+> creates ~108 resources at once. On a brand-new subscription (or a region under
+> load), Azure Resource Manager's eventual consistency can lag behind Terraform's
+> read-after-write and surface transient `404 ResourceNotFound` /
+> `Provider produced inconsistent result` errors. If that happens, re-run the apply
+> with reduced parallelism so ARM can keep up:
+>
+> ```bash
+> terraform apply -parallelism=3
+> ```
+>
+> Terraform converges over repeated applies. A subscription that has already hosted
+> deployments usually applies cleanly at the default parallelism.
+
 ## 4. Next: configure SharePoint
 
 Once the VMs are up, continue with

@@ -8,6 +8,11 @@ terraform plan
 terraform apply
 ```
 
+On a brand-new or capacity-constrained subscription, if the apply hits transient
+`404 ResourceNotFound` / "inconsistent result" errors from Azure Resource Manager,
+re-run it with reduced parallelism (`terraform apply -parallelism=3`); Terraform
+converges over repeated applies. See [Getting-Started](Getting-Started) for details.
+
 ## Tear down
 
 ```bash
