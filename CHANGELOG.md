@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CI workflow `.github/workflows/terraform.yml` running on pull requests that touch
+  `terraform/**`: `terraform fmt -check`, `init -backend=false` and `validate` on
+  `ubuntu-latest` (#8).
+
 - Pester test suite `tests/StartAzVM.Tests.ps1` covering `Get-VMDisk`,
   `Get-DiskSkuUpdatePlan`, `Get-DiskSku` and `Set-DiskSku` (15 tests, no real Azure
   calls) (#6).
