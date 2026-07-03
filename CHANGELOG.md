@@ -5,6 +5,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `terraform/outputs.tf` exposing the resource group name and location, the admin
+  username, a map of each VM to its private IP, the VM resource IDs, and the Azure
+  Bastion host name (#12).
+
+### Changed
+
+- **Credentials are now user-provided and required** (#12): removed the generated
+  `random_password` and the deprecated top-level `admin_username`/`admin_password`
+  module inputs; credentials flow only through `account_credentials`.
+  `adds_domain_admin_password` is now required with a 12-123 character validation
+  (Azure Windows rule) and `adds_domain_admin_username` with a 1-20 character /
+  reserved-word validation. This fixes the previously broken "empty password"
+  path, where an empty value was passed to Azure and rejected.
+- Removed `prevent_destroy` on the resource group so the documented
+  `terraform destroy` teardown works (#12).
+- Wired `var.resource_group_name` and `var.location` (previously hardcoded in
+  locals) so the RG name and deployment region are consistent and configurable;
+  defaults preserve current behavior (`RG-SPSE-SmallFarm` / `francecentral`) (#12).
+
 ### Changed
 
 - Bump low-risk Terraform versions (#10): `hashicorp/azurerm` provider

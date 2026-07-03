@@ -30,8 +30,8 @@ cp terraform.tfvars.example terraform.tfvars
 Edit `terraform.tfvars` and set at least:
 
 - `arm_subscription_id`
-- `adds_domain_admin_username`
-- `adds_domain_admin_password`
+- `adds_domain_admin_username` (required, 1-20 chars, not a reserved name)
+- `adds_domain_admin_password` (required, Windows rules: 12-123 chars with complexity)
 
 > ⚠️ `terraform.tfvars` and state files are **git-ignored** — they hold secrets and
 > your resource layout. Never commit them.

@@ -12,8 +12,9 @@ defaults** and must be supplied through `terraform.tfvars` (git-ignored). A trac
 | `adds_domain_admin_username` | Domain administrator username.                |
 | `adds_domain_admin_password` | Domain administrator password (sensitive).    |
 
-If `adds_domain_admin_password` is left empty, the configuration generates a random
-password via the `random_password` resource.
+`adds_domain_admin_password` is **required** and must be a Windows-compliant password
+(12-123 characters, with complexity). No password is generated — you provide your own.
+`adds_domain_admin_username` is also required (1-20 characters, not a reserved name).
 
 ## Common optional variables
 
