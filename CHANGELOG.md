@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Wiki guidance on using `terraform apply -parallelism=3` to work around transient
+  Azure Resource Manager eventual-consistency errors when applying the full farm on
+  a fresh or capacity-constrained subscription (#14).
 - `enable_availability_zones` variable (default `false`) to control zonal placement
   of the VMs, their public IPs and the Azure Bastion (#14). Non-zonal by default,
   which avoids single-zone capacity restrictions (`SkuNotAvailable`) and works in
