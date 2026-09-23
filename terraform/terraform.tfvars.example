@@ -25,7 +25,7 @@ adds_domain_admin_password = "ChangeMe-Str0ng!Passw0rd"
 
 # --- Common optional overrides ----------------------------------------------
 
-# resource_group_name = "RG-SPSE-SmallFarm"
+# resource_group_name = "ARMConfigKit"
 # Prefix for resource names. Leave empty/unset to derive it from resource_group_name
 # (lowercased, alphanumerics only, truncated to 12 chars). Set a value for a custom
 # short prefix, e.g. "armck" -> armck-VNET.

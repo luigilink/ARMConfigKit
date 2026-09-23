@@ -7,7 +7,7 @@
 # =======================
 # User parameters
 # =======================
-$resourceGroup = "RG-SPSE-SmallFarm" # <<< replace if needed
+$resourceGroup = "ARMConfigKit" # <<< replace if needed
 $targetSku     = "StandardSSD_LRS"   # other valid values: Standard_LRS, Premium_LRS, PremiumV2_LRS (region support applies)
 $deallocateVM  = $true               # safer path for OS/data disk SKU changes
 $whatIf        = $true               # dry-run by default; set to $false to execute changes
