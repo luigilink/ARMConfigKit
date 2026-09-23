@@ -16,6 +16,7 @@ Desired State Configuration.
 - [📖 Usage](Usage) — day-to-day operations, `StartAzVM.ps1`, and the hand-off to
   SPSConfigKit.
 - [🗺️ Topology](Topology) — the sample farm roles/VMs and how to scale it.
+- [📦 Release Process](Release-Process) — how to version, tag and ship a release.
 
 ## How the two kits fit together
 
