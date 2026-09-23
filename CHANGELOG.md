@@ -5,6 +5,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The default `resource_group_name` is now `ARMConfigKit` (was `RG-SPSE-SmallFarm`) (#21)
+  - Updated the Terraform default (`terraform/variables.tf`), the commented example in
+    `terraform/terraform.tfvars.example`, the `StartAzVM.ps1` sample resource group, and the
+    variables table in `wiki/Configuration.md`. The derived resource prefix now defaults to
+    `armconfigkit` (e.g. `armconfigkit-VNET`). The naming-derivation example in the wiki was
+    refreshed to `Contoso-SPSE-Farm → contosospsef`, which still illustrates the
+    lowercase/strip/truncate-to-12 rule on a messy name. Defaults and documentation only — no
+    change to the deployment behaviour.
+
 ## [1.0.0] - 2026-07-03
 
 First release of ARMConfigKit — a Terraform lab that provisions a SharePoint

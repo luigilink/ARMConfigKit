@@ -1,5 +1,5 @@
 variable "resource_group_name" {
-  default     = "RG-SPSE-SmallFarm"
+  default     = "ARMConfigKit"
   description = "Name of the resource group to create and/or use for this deployment."
 }
 

@@ -20,7 +20,7 @@ defaults** and must be supplied through `terraform.tfvars` (git-ignored). A trac
 
 | Variable                    | Default              | Description                                  |
 | --------------------------- | -------------------- | -------------------------------------------- |
-| `resource_group_name`       | `RG-SPSE-SmallFarm`  | Resource group to create/use.                |
+| `resource_group_name`       | `ARMConfigKit`       | Resource group to create/use.                |
 | `resource_short_name`       | `""` (derived)       | Prefix for resource names; empty = derived from the RG name. |
 | `location`                  | `eastus`             | Azure region.                                |
 | `adds_fqdn`                 | `contoso.com`        | Active Directory domain FQDN.                |
@@ -35,7 +35,7 @@ Resources are named `<short_name>-<role>` (e.g. `armconfigkit-VNET`,
 `armconfigkit-PDC1-NIC1`). By default `resource_short_name` is empty and the prefix
 is **derived from `resource_group_name`** — lowercased, non-alphanumeric characters
 removed, truncated to 12 characters (so `ARMConfigKit` → `armconfigkit`,
-`RG-SPSE-SmallFarm` → `rgspsesmallf`). Set `resource_short_name` explicitly to use a
+`Contoso-SPSE-Farm` → `contosospsef`). Set `resource_short_name` explicitly to use a
 custom short prefix (e.g. `armck`).
 
 ## Availability zones
