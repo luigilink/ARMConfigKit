@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     navigation (mirroring the other luigilink kits) and refreshed the `Home` page list.
     Documentation only.
 
+### Fixed
+
+- Terraform tag consistency (#25)
+  - The `add_default_tags` variable description listed a `createdOn` tag that was never applied
+    (only `source` and `sharePointVersion` are set); the description now matches the actual
+    tags. The Azure Bastion public IP (`azurerm_public_ip.bastion_pip`) hardcoded `tags = {}`
+    and is now tagged with `local.tags` like every other resource.
+
 ## [1.0.0] - 2026-07-03
 
 First release of ARMConfigKit — a Terraform lab that provisions a SharePoint
