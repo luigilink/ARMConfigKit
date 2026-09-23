@@ -1,8 +1,13 @@
 # ARMConfigKit
 
+![Latest release](https://img.shields.io/github/v/release/luigilink/ARMConfigKit.svg?style=flat)
 ![Latest release date](https://img.shields.io/github/release-date/luigilink/ARMConfigKit.svg?style=flat)
 ![Total downloads](https://img.shields.io/github/downloads/luigilink/ARMConfigKit/total.svg?style=flat)  
 ![Issues opened](https://img.shields.io/github/issues/luigilink/ARMConfigKit.svg?style=flat)
+![Last commit](https://img.shields.io/github/last-commit/luigilink/ARMConfigKit.svg?style=flat)
+![License](https://img.shields.io/github/license/luigilink/ARMConfigKit.svg?style=flat)  
+![CI Terraform](https://github.com/luigilink/ARMConfigKit/actions/workflows/terraform.yml/badge.svg)
+![CI Pester](https://github.com/luigilink/ARMConfigKit/actions/workflows/pester.yml/badge.svg)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
 ## Description
@@ -22,22 +27,12 @@ linked by documentation only — this repository contains no DSC content.
 
 ## Topology
 
-The sample topology deploys a small farm, but the design is **not limited to a fixed
-number of machines** — the VM list is data-driven (`vms_informations` in
-`terraform/variables.tf`) and SPSConfigKit scales to any number of nodes, so you can
-add or remove servers to match your scenario. The default sample provisions:
-
-| Role | VM   | Purpose                                     |
-| ---- | ---- | ------------------------------------------- |
-| PDC  | PDC1 | Active Directory domain controller          |
-| PULL | PULL | DSC pull server / software share            |
-| SQL  | SQL1 | SQL Server                                  |
-| APP  | APP1 | SharePoint application server               |
-| SCH  | SCH1 | SharePoint search server                    |
-| WFE  | WFE1 | SharePoint web front end                    |
-| OOS  | OOS1 | Office Online Server                        |
-| SWM  | SWM1 | Workflow Manager                            |
-| ARR  | ARR  | Application Request Routing (reverse proxy) |
+The sample provisions a small SharePoint Subscription Edition farm (PDC, PULL, SQL,
+APP, SCH, WFE, OOS, SWM, ARR), but the design is **not limited to a fixed number of
+machines** — the VM list is data-driven (`vms_informations` in
+`terraform/variables.tf`) and SPSConfigKit scales to any number of nodes. See the
+[Topology](https://github.com/luigilink/ARMConfigKit/wiki/Topology) wiki page for the
+full role/VM breakdown.
 
 ## Requirements
 

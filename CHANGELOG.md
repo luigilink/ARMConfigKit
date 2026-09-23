@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     refreshed to `Contoso-SPSE-Farm → contosospsef`, which still illustrates the
     lowercase/strip/truncate-to-12 rule on a messy name. Defaults and documentation only — no
     change to the deployment behaviour.
+- Polished the README and wiki (#23)
+  - Enriched the README badge row (latest release/version, license, CI Terraform and Pester
+    status, last commit) and moved the full `Topology` table out of the README into a dedicated
+    `Topology` wiki page, leaving a short intro and link behind. Added a `_Sidebar.md` wiki
+    navigation (mirroring the other luigilink kits) and refreshed the `Home` page list.
+    Documentation only.
 
 ## [1.0.0] - 2026-07-03
 
