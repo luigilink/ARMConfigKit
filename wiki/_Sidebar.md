@@ -5,6 +5,7 @@
 - [⚙️ Configuration](Configuration)
 - [📖 Usage](Usage)
 - [🗺️ Topology](Topology)
+- [📦 Release Process](Release-Process)
 
 ---
 
