@@ -11,10 +11,11 @@ Desired State Configuration.
 
 ## Pages
 
-- **[Getting-Started](Getting-Started)** — prerequisites and first deployment.
-- **[Configuration](Configuration)** — variables and `terraform.tfvars`.
-- **[Usage](Usage)** — day-to-day operations, `StartAzVM.ps1`, and the hand-off to
+- [🚀 Getting Started](Getting-Started) — prerequisites and first deployment.
+- [⚙️ Configuration](Configuration) — variables and `terraform.tfvars`.
+- [📖 Usage](Usage) — day-to-day operations, `StartAzVM.ps1`, and the hand-off to
   SPSConfigKit.
+- [🗺️ Topology](Topology) — the sample farm roles/VMs and how to scale it.
 
 ## How the two kits fit together
 
