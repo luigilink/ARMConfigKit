@@ -239,7 +239,7 @@ variable "tags" {
 variable "add_default_tags" {
   type        = bool
   default     = false
-  description = "If true, the default tags will be added to resource. Default tags are: 'source', 'createdOn', and 'sharePointVersion'."
+  description = "If true, the default tags will be added to resource. Default tags are: 'source' and 'sharePointVersion'."
 }
 
 variable "rdp_traffic_rule" {
