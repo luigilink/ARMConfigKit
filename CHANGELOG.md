@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bumped the AzureRM provider to `4.81.0` (#29)
+  - `terraform/main.tf` now pins `azurerm = "=4.81.0"` (was `=4.80.0`). Refreshing the lock
+    file with `terraform init -upgrade` also moved two transitive providers used by the AVM
+    modules: `random` `3.9.0` → `3.9.1` and `tls` `4.3.0` → `4.4.1`. `azapi` stays pinned at
+    `=2.7.0` (documented identity bug in 2.8.0).
 - The default `resource_group_name` is now `ARMConfigKit` (was `RG-SPSE-SmallFarm`) (#21)
   - Updated the Terraform default (`terraform/variables.tf`), the commented example in
     `terraform/terraform.tfvars.example`, the `StartAzVM.ps1` sample resource group, and the
