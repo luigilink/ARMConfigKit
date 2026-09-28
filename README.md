@@ -64,6 +64,10 @@ full walkthrough.
 - `scripts/StartAzVM.ps1` — re-applies the `StandardSSD_LRS` SKU to every managed
   disk in the resource group (deallocate → `az disk update` → start). Useful because
   an Azure policy can periodically downgrade lab disks back to Standard HDD.
+- `scripts/Connect-AzBastionTunnel.ps1` — opens one or more native-client Azure
+  Bastion tunnels (RDP/SSH over 443) so a local client (Windows App on macOS, mstsc
+  on Windows) can reach the VMs without the heavy browser Bastion session. Requires
+  the Bastion host to be Standard SKU with tunneling enabled.
 
 ## Documentation
 
