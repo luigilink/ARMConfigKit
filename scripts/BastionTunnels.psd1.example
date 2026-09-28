@@ -1,0 +1,21 @@
+@{
+    # Resource group holding the Bastion host and the target VMs.
+    ResourceGroup = 'ARMConfigKit'
+    # Bastion host name (must be Standard SKU with Native Client Support / tunneling).
+    BastionName   = 'armconfigkit-BASTION'
+    # VM port to tunnel to: 3389 for RDP, 22 for SSH.
+    ResourcePort  = 3389
+    # One entry per VM. Port is the LOCAL loopback port — keep it stable so the
+    # matching PC in Windows App / mstsc (localhost:<Port>) can be reused.
+    VMs           = @(
+        @{ Name = 'PDC1'; Port = 50001 }
+        @{ Name = 'PULL'; Port = 50002 }
+        @{ Name = 'SQL1'; Port = 50003 }
+        @{ Name = 'APP1'; Port = 50004 }
+        @{ Name = 'APP2'; Port = 50005 }
+        @{ Name = 'WFE1'; Port = 50006 }
+        @{ Name = 'WFE2'; Port = 50007 }
+        @{ Name = 'OOS1'; Port = 50008 }
+        @{ Name = 'ARR' ; Port = 50009 }
+    )
+}

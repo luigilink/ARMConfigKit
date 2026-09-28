@@ -67,7 +67,10 @@ full walkthrough.
 - `scripts/Connect-AzBastionTunnel.ps1` — opens one or more native-client Azure
   Bastion tunnels (RDP/SSH over 443) so a local client (Windows App on macOS, mstsc
   on Windows) can reach the VMs without the heavy browser Bastion session. Requires
-  the Bastion host to be Standard SKU with tunneling enabled.
+  the Bastion host to be Standard SKU with tunneling enabled. Drive it with a config
+  file for stable per-VM ports — copy `scripts/BastionTunnels.psd1.example` to
+  `scripts/BastionTunnels.psd1` (git-ignored) and run
+  `./Connect-AzBastionTunnel.ps1` — or pass VMs inline with `-VMName APP1,APP2`.
 
 ## Documentation
 
