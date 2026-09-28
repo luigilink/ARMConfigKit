@@ -5,6 +5,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `scripts/Connect-AzBastionTunnel.ps1` (#34)
+  - Opens one or more native-client Azure Bastion tunnels (RDP/SSH over 443), one local
+    loopback port per VM, so a local client (Windows App on macOS, mstsc on Windows) can reach
+    the lab VMs without the bandwidth-heavy browser Bastion session. Preflights `az login`, the
+    Bastion Standard SKU + tunneling requirement (prints the upgrade command otherwise) and each
+    VM's resource ID; handles busy local ports, waits for the port to listen, and tears every
+    tunnel down on exit. Requires PowerShell 7+ and the Azure CLI.
+
 ## [1.1.0] - 2026-09-23
 
 ### Changed
