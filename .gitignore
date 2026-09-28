@@ -33,3 +33,7 @@ changes.txt
 # --- Editors / OS ------------------------------------------------------------
 .vscode/
 **/.DS_Store
+
+# --- Bastion tunnel helper ---------------------------------------------------
+# Local, deployment-specific tunnel config. The tracked *.example is the template.
+scripts/BastionTunnels.psd1

@@ -5,43 +5,53 @@
   without the heavy browser Bastion experience.
 
 .DESCRIPTION
-  For each requested VM the script resolves its resource ID and starts an
-  `az network bastion tunnel` on an incrementing local loopback port, then prints
-  the VM -> localhost:port mapping. All tunnels run until you press Enter (or
-  Ctrl+C), at which point every tunnel process is stopped.
+  Tunnels are described either by a config file (-ConfigPath, a .psd1 listing the
+  VMs and their local ports) or inline with -VMName. For each VM the script
+  resolves its resource ID and starts an `az network bastion tunnel` on a local
+  loopback port, then prints the VM -> localhost:port mapping. All tunnels run
+  until you press Enter (or Ctrl+C), at which point every tunnel is stopped.
+
+  A config file gives each VM a STABLE port, so the matching PCs in Windows App
+  can be configured once and reused. Copy BastionTunnels.psd1.example to
+  BastionTunnels.psd1 (git-ignored) and adjust it.
 
   Requires the Bastion host to be Standard SKU with Native Client Support
   (tunneling) enabled — Basic SKU only supports the browser connection.
 
-.PARAMETER ResourceGroup
-  Resource group holding the Bastion host and the target VMs. Default 'ARMConfigKit'.
-
-.PARAMETER BastionName
-  Name of the Bastion host. Default 'armconfigkit-BASTION'.
+.PARAMETER ConfigPath
+  Path to a .psd1 config file. Defaults to BastionTunnels.psd1 next to this
+  script when it exists. The file supplies ResourceGroup, BastionName,
+  ResourcePort and a VMs list (each entry: Name, optional Port).
 
 .PARAMETER VMName
-  One or more VM names to tunnel to (e.g. PULL, APP1, APP2). Each gets its own
-  local port.
+  One or more VM names to tunnel to. Overrides the config VM list when supplied;
+  ports are then assigned incrementally from -BasePort.
+
+.PARAMETER ResourceGroup
+  Resource group holding the Bastion host and the VMs. Overrides the config value.
+
+.PARAMETER BastionName
+  Name of the Bastion host. Overrides the config value.
 
 .PARAMETER BasePort
-  First local port to use; subsequent VMs use BasePort+1, BasePort+2, ... Default 50001.
+  First local port for VMs without an explicit port (incremented per VM). Default 50001.
 
 .PARAMETER ResourcePort
   Port on the target VM to tunnel to. Default 3389 (RDP); use 22 for SSH.
 
 .EXAMPLE
-  .\Connect-AzBastionTunnel.ps1 -VMName APP1
+  .\Connect-AzBastionTunnel.ps1 -ConfigPath .\BastionTunnels.psd1
 
 .EXAMPLE
-  .\Connect-AzBastionTunnel.ps1 -VMName PULL,APP1,APP2 -BasePort 50001
+  .\Connect-AzBastionTunnel.ps1 -VMName APP1,APP2 -BasePort 50004
 #>
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-    [string]$ResourceGroup = 'ARMConfigKit',
-    [string]$BastionName = 'armconfigkit-BASTION',
-    [Parameter(Mandatory)]
+    [string]$ConfigPath,
     [string[]]$VMName,
+    [string]$ResourceGroup,
+    [string]$BastionName,
     [int]$BasePort = 50001,
     [int]$ResourcePort = 3389
 )
@@ -64,6 +74,46 @@ function Test-LocalPortFree {
         $listener.Start(); $listener.Stop(); return $true
     }
     catch { return $false }
+}
+
+# =======================
+# Resolve configuration (explicit params override the config file)
+# =======================
+$config = $null
+if (-not $PSBoundParameters.ContainsKey('ConfigPath')) {
+    $default = Join-Path $PSScriptRoot 'BastionTunnels.psd1'
+    if (Test-Path $default) { $ConfigPath = $default }
+}
+if ($ConfigPath) {
+    if (-not (Test-Path $ConfigPath)) {
+        Write-Host "Config file not found: $ConfigPath" -ForegroundColor Red
+        exit 1
+    }
+    $config = Import-PowerShellDataFile -Path $ConfigPath
+}
+
+if (-not $ResourceGroup) { $ResourceGroup = $config.ResourceGroup }
+if (-not $BastionName) { $BastionName = $config.BastionName }
+if (-not $PSBoundParameters.ContainsKey('ResourcePort') -and $config.ResourcePort) { $ResourcePort = $config.ResourcePort }
+if ([string]::IsNullOrWhiteSpace($ResourceGroup)) { $ResourceGroup = 'ARMConfigKit' }
+if ([string]::IsNullOrWhiteSpace($BastionName)) { $BastionName = 'armconfigkit-BASTION' }
+
+# Build the list of tunnels: { Name; Port } — inline -VMName wins, else the
+# config VMs (with their explicit ports), else nothing.
+$requested = @()
+$autoPort = $BasePort
+if ($VMName) {
+    foreach ($name in $VMName) { $requested += [pscustomobject]@{ Name = $name; Port = $autoPort }; $autoPort++ }
+}
+elseif ($config -and $config.VMs) {
+    foreach ($vm in $config.VMs) {
+        $p = if ($vm.Port) { [int]$vm.Port } else { $autoPort; $autoPort++ }
+        $requested += [pscustomobject]@{ Name = $vm.Name; Port = $p }
+    }
+}
+if ($requested.Count -eq 0) {
+    Write-Host "No VMs to tunnel. Pass -VMName or provide a config file with a VMs list." -ForegroundColor Red
+    exit 1
 }
 
 # =======================
@@ -93,11 +143,13 @@ if ($bastion.sku -ne 'Standard' -or -not $bastion.tunneling) {
 # Open the tunnels
 # =======================
 $tunnels = @()
-$port = $BasePort
 $tmp = [System.IO.Path]::GetTempPath()
 
 try {
-    foreach ($vm in $VMName) {
+    foreach ($entry in $requested) {
+        $vm = $entry.Name
+        $port = $entry.Port
+
         $resourceId = az vm show --resource-group $ResourceGroup --name $vm --query id -o tsv 2>$null
         if ([string]::IsNullOrWhiteSpace($resourceId)) {
             Write-Host "[$vm] VM not found in resource group '$ResourceGroup' — skipping." -ForegroundColor Yellow
@@ -105,7 +157,7 @@ try {
         }
 
         while (-not (Test-LocalPortFree -Port $port)) {
-            Write-Host "Local port $port is busy, trying $($port + 1)..." -ForegroundColor DarkGray
+            Write-Host "[$vm] Local port $port is busy, trying $($port + 1)..." -ForegroundColor DarkGray
             $port++
         }
 
@@ -141,7 +193,6 @@ try {
         }
 
         $tunnels += [pscustomobject]@{ VM = $vm; Port = $port; Process = $proc; OutLog = $outLog; ErrLog = $errLog }
-        $port++
     }
 
     if ($tunnels.Count -eq 0) {
