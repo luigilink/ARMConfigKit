@@ -38,15 +38,25 @@ runs `az disk update` on the OS and data disks, then starts the VM again.
 
 ```powershell
 # Requires: Azure CLI installed and logged in (az login), PowerShell 7+
-./scripts/StartAzVM.ps1
+./scripts/StartAzVM.ps1            # apply
+./scripts/StartAzVM.ps1 -WhatIf    # preview only: nothing is deallocated, started or changed
 ```
 
-Key script settings (top of the file):
+The script is configured through parameters; the defaults are the values used by the lab:
 
-- `$resourceGroup` — the resource group to process.
-- `$targetSku` — desired disk SKU (`StandardSSD_LRS`).
-- `$whatIf` — set to `$true` for a dry run.
-- `$deallocateVM` / `$startAfter` — deallocate before changing SKU and restart after.
+| Parameter | Default | Purpose |
+|---|---|---|
+| `-ResourceGroup` | `ARMConfigKit` | Resource group to process. |
+| `-TargetSku` | `StandardSSD_LRS` | Desired disk SKU (`Standard_LRS`, `StandardSSD_LRS`, `Premium_LRS`, `PremiumV2_LRS`). |
+| `-DeallocateVM` | `$true` | Deallocate each VM before changing its disk SKU. |
+| `-StartAfter` | `$true` | Start the VM again if the script deallocated it. |
+| `-ThrottleLimit` | `5` | Maximum number of VMs processed concurrently. |
+| `-WhatIf` | off | Simulation: lists what would be done without doing it. |
+
+Boolean parameters take the `-Name:$false` form, e.g. `./scripts/StartAzVM.ps1 -StartAfter:$false`.
+
+> The script no longer defaults to a dry run: run it with `-WhatIf` to simulate.
+> `-Confirm` is not supported, because the VMs are processed in parallel runspaces.
 
 ## Hand-off to SPSConfigKit
 

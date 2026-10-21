@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `StartAzVM.ps1` now takes parameters and uses the native `-WhatIf` (#38)
+  - The top-of-file variables (`$resourceGroup`, `$targetSku`, `$deallocateVM`, `$startAfter`,
+    `$throttleLimit`) are replaced by a `param()` block (`-ResourceGroup`, `-TargetSku` validated
+    against the supported disk SKUs, `-DeallocateVM`, `-StartAfter`, `-ThrottleLimit`) whose
+    defaults are the previous values, so the script can be run every day without editing a tracked
+    file. The hand-rolled `$whatIf` flag is replaced by the standard `-WhatIf` switch, which now
+    also covers the deallocate and start steps (through new `Invoke-VMDeallocate` /
+    `Invoke-VMStart` helpers) and is propagated into the parallel runspaces. **Behaviour change:**
+    the script no longer defaults to a dry run — pass `-WhatIf` to simulate. `-Confirm` is not
+    supported because VMs are processed in parallel.
+
 - Document overriding the VM topology in `terraform.tfvars` instead of editing `variables.tf` (#36)
   - `vms_informations` is the only variable that is specific to a given lab, yet it lived as the
     `default` in the tracked `variables.tf`, so a local topology left that file permanently modified.

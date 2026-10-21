@@ -1,18 +1,57 @@
-﻿# Requires: Azure CLI installed and logged in (az login)
-# Requires: PowerShell 7+ (uses ForEach-Object -Parallel)
-# Scope: Update all managed disks (OS + data) on each VM in a resource group to StandardSSD_LRS
-#        The VMs are processed in parallel to speed up a full remediation pass.
-#Requires -Version 7.0
+﻿#Requires -Version 7.0
 
-# =======================
-# User parameters
-# =======================
-$resourceGroup = "ARMConfigKit" # <<< replace if needed
-$targetSku     = "StandardSSD_LRS"   # other valid values: Standard_LRS, Premium_LRS, PremiumV2_LRS (region support applies)
-$deallocateVM  = $true               # safer path for OS/data disk SKU changes
-$whatIf        = $true               # dry-run by default; set to $false to execute changes
-$startAfter    = $true               # start VM again if we deallocated it
-$throttleLimit = 5                   # max number of VMs processed concurrently
+<#
+.SYNOPSIS
+  Re-applies a target managed-disk SKU to every VM disk in a resource group.
+
+.DESCRIPTION
+  An Azure policy can periodically downgrade the lab's managed disks back to Standard HDD. For
+  every VM in the resource group, this script deallocates the machine, runs `az disk update` on
+  the OS and data disks that are not already at the target SKU, then starts the VM again. VMs are
+  processed in parallel (ForEach-Object -Parallel, PowerShell 7+).
+
+  Requires the Azure CLI, logged in (`az login`). Use the native -WhatIf switch to preview every
+  change (disk updates, deallocate and start) without applying anything.
+
+.PARAMETER ResourceGroup
+  Resource group whose VMs are processed.
+
+.PARAMETER TargetSku
+  Disk SKU to apply (region support applies for Premium_LRS / PremiumV2_LRS).
+
+.PARAMETER DeallocateVM
+  Deallocate the VM before changing disk SKUs (the safer path for OS/data disk SKU changes).
+  Use -DeallocateVM:$false to skip.
+
+.PARAMETER StartAfter
+  Start the VM again if the script deallocated it. Use -StartAfter:$false to leave it stopped.
+
+.PARAMETER ThrottleLimit
+  Maximum number of VMs processed concurrently.
+
+.EXAMPLE
+  ./StartAzVM.ps1
+
+.EXAMPLE
+  ./StartAzVM.ps1 -WhatIf
+
+.EXAMPLE
+  ./StartAzVM.ps1 -ResourceGroup MyLab -TargetSku Premium_LRS
+#>
+[CmdletBinding(SupportsShouldProcess)]
+param(
+    [string]$ResourceGroup = 'ARMConfigKit',
+
+    [ValidateSet('Standard_LRS', 'StandardSSD_LRS', 'Premium_LRS', 'PremiumV2_LRS')]
+    [string]$TargetSku = 'StandardSSD_LRS',
+
+    [bool]$DeallocateVM = $true,
+
+    [bool]$StartAfter = $true,
+
+    [ValidateRange(1, 32)]
+    [int]$ThrottleLimit = 5
+)
 
 # =======================
 # Helpers
@@ -41,6 +80,34 @@ function Set-DiskSku {
         return $true
     }
     $null = az disk update --ids $DiskId --sku $NewSku --only-show-errors
+    return $LASTEXITCODE -eq 0
+}
+
+function Invoke-VMDeallocate {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([bool])]
+    param(
+        [string]$ResourceGroup,
+        [string]$VmName
+    )
+    if (-not $PSCmdlet.ShouldProcess($VmName, 'Deallocate VM')) {
+        return $true
+    }
+    $null = az vm deallocate -g $ResourceGroup -n $VmName --only-show-errors
+    return $LASTEXITCODE -eq 0
+}
+
+function Invoke-VMStart {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([bool])]
+    param(
+        [string]$ResourceGroup,
+        [string]$VmName
+    )
+    if (-not $PSCmdlet.ShouldProcess($VmName, 'Start VM')) {
+        return $true
+    }
+    $null = az vm start -g $ResourceGroup -n $VmName --only-show-errors
     return $LASTEXITCODE -eq 0
 }
 
@@ -132,15 +199,15 @@ function Get-DiskSkuUpdatePlan {
 # above are loaded; the remediation below must not run.
 if ($MyInvocation.InvocationName -eq '.') { return }
 
-Write-Host "Listing VMs in resource group '$resourceGroup'..." -ForegroundColor Cyan
+Write-Host "Listing VMs in resource group '$ResourceGroup'..." -ForegroundColor Cyan
 
 # Capture raw output and validate the az call before parsing: a non-zero exit
 # code (expired login, wrong/empty resource group, missing permissions) must be
 # surfaced as an error, not silently masked as "no VMs". Invalid/partial JSON
 # would otherwise make ConvertFrom-Json throw an unhandled terminating error.
-$vmListRaw = az vm list -g $resourceGroup --output json 2>$null
+$vmListRaw = az vm list -g $ResourceGroup --output json 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to list VMs in resource group '$resourceGroup' (az exit code $LASTEXITCODE). Check 'az login', the resource group name and your permissions." -ForegroundColor Red
+    Write-Host "Failed to list VMs in resource group '$ResourceGroup' (az exit code $LASTEXITCODE). Check 'az login', the resource group name and your permissions." -ForegroundColor Red
     exit 1
 }
 
@@ -153,7 +220,7 @@ catch {
 }
 
 if (-not $vmList -or $vmList.Count -eq 0) {
-    Write-Host "No VMs found in resource group '$resourceGroup'." -ForegroundColor Yellow
+    Write-Host "No VMs found in resource group '$ResourceGroup'." -ForegroundColor Yellow
     return
 }
 
@@ -163,23 +230,36 @@ if (-not $vmList -or $vmList.Count -eq 0) {
 # defined above) rather than duplicating their bodies.
 $getDiskSkuDef  = ${function:Get-DiskSku}.ToString()
 $setDiskSkuDef  = ${function:Set-DiskSku}.ToString()
+$deallocateDef  = ${function:Invoke-VMDeallocate}.ToString()
+$startDef       = ${function:Invoke-VMStart}.ToString()
 $getVMDisksDef  = ${function:Get-VMDisk}.ToString()
 $getPlanDef     = ${function:Get-DiskSkuUpdatePlan}.ToString()
 
-$results = $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
+# Native -WhatIf: $WhatIfPreference is not inherited by the parallel runspaces, so capture it
+# here and forward it explicitly to every ShouldProcess-aware helper. ShouldProcess also does not
+# print its "What if:" message from a parallel runspace, so each step announces itself with an
+# explicit prefix below to make a simulation unambiguous.
+$dryRun = [bool]$WhatIfPreference
+if ($dryRun) {
+    Write-Host "WhatIf: simulation only — no VM will be deallocated or started and no disk will be changed." -ForegroundColor Yellow
+}
+
+$results = $vmList | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
     # ---- Re-hydrate the parent scope -------------------------------------
     # Variables from the parent scope are not visible here, so bring across
     # everything this block needs via $using:.
-    $resourceGroup = $using:resourceGroup
-    $targetSku     = $using:targetSku
-    $deallocateVM  = $using:deallocateVM
-    $whatIf        = $using:whatIf
-    $startAfter    = $using:startAfter
+    $resourceGroup = $using:ResourceGroup
+    $targetSku     = $using:TargetSku
+    $deallocateVM  = $using:DeallocateVM
+    $whatIf        = $using:dryRun
+    $startAfter    = $using:StartAfter
 
     # Re-create the helper functions inside this runspace from the captured
     # definitions.
     ${function:Get-DiskSku} = $using:getDiskSkuDef
     ${function:Set-DiskSku} = $using:setDiskSkuDef
+    ${function:Invoke-VMDeallocate} = $using:deallocateDef
+    ${function:Invoke-VMStart} = $using:startDef
     ${function:Get-VMDisk} = $using:getVMDisksDef
     ${function:Get-DiskSkuUpdatePlan} = $using:getPlanDef
 
@@ -242,25 +322,21 @@ $results = $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
     # Deallocate (safer for OS and data disk SKU transitions)
     $wasDeallocated = $false
     if ($deallocateVM) {
-        if ($whatIf) {
-            Write-Host "[$vmName] [WhatIf] Would deallocate VM before updates." -ForegroundColor Yellow
-            $wasDeallocated = $true
-        } else {
-            Write-Host "[$vmName] Deallocating VM..." -ForegroundColor Magenta
-            az vm deallocate -g $resourceGroup -n $vmName --only-show-errors | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "[$vmName] Failed to deallocate. Skipping this VM." -ForegroundColor Red
-                $result.DeallocateFailed = $true
-                $result.Failed++
-                return $result
-            }
-            $wasDeallocated = $true
+        $prefix = if ($whatIf) { 'What if: would deallocate VM' } else { 'Deallocating VM' }
+        Write-Host "[$vmName] $prefix..." -ForegroundColor Magenta
+        if (-not (Invoke-VMDeallocate -ResourceGroup $resourceGroup -VmName $vmName -WhatIf:$whatIf)) {
+            Write-Host "[$vmName] Failed to deallocate. Skipping this VM." -ForegroundColor Red
+            $result.DeallocateFailed = $true
+            $result.Failed++
+            return $result
         }
+        $wasDeallocated = $true
     }
 
     # Apply disk SKU updates
     foreach ($item in $updates) {
-        Write-Host ("[$vmName] Updating disk SKU: {0}`n    Current: {1}`n    Target : {2}" -f $item.DiskId, $item.CurrentSku, $item.NewSku) -ForegroundColor Cyan
+        $prefix = if ($whatIf) { 'What if: would update disk SKU' } else { 'Updating disk SKU' }
+        Write-Host ("[$vmName] {3}: {0}`n    Current: {1}`n    Target : {2}" -f $item.DiskId, $item.CurrentSku, $item.NewSku, $prefix) -ForegroundColor Cyan
         $ok = Set-DiskSku -DiskId $item.DiskId -NewSku $item.NewSku -WhatIf:$whatIf
         if ($ok) {
             $result.Updated++
@@ -272,16 +348,12 @@ $results = $vmList | ForEach-Object -ThrottleLimit $throttleLimit -Parallel {
 
     # Start VM back if we deallocated it
     if ($wasDeallocated -and $startAfter) {
-        if ($whatIf) {
-            Write-Host "[$vmName] [WhatIf] Would start VM after updates." -ForegroundColor Yellow
-        } else {
-            Write-Host "[$vmName] Starting VM..." -ForegroundColor Magenta
-            az vm start -g $resourceGroup -n $vmName --only-show-errors | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "[$vmName] Failed to start VM. Please check the portal/CLI." -ForegroundColor Red
-                $result.StillDeallocated = $true
-                $result.Failed++
-            }
+        $prefix = if ($whatIf) { 'What if: would start VM' } else { 'Starting VM' }
+        Write-Host "[$vmName] $prefix..." -ForegroundColor Magenta
+        if (-not (Invoke-VMStart -ResourceGroup $resourceGroup -VmName $vmName -WhatIf:$whatIf)) {
+            Write-Host "[$vmName] Failed to start VM. Please check the portal/CLI." -ForegroundColor Red
+            $result.StillDeallocated = $true
+            $result.Failed++
         }
     }
 
