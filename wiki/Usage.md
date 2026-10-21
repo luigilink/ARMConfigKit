@@ -50,11 +50,17 @@ The script is configured through parameters; the defaults are the values used by
 | `-TargetSku` | `StandardSSD_LRS` | Desired disk SKU (`Standard_LRS`, `StandardSSD_LRS`, `Premium_LRS`, `PremiumV2_LRS`). |
 | `-DeallocateVM` | `$true` | Deallocate each VM before changing its disk SKU. |
 | `-StartAfter` | `$true` | Start the VM again if the script deallocated it. |
+| `-StartAll` | `$true` | Also start every VM of the group that is stopped (deallocated or stopped), even when none of its disks needed a SKU change. Running VMs and VMs that are starting, stopping or deallocating are left alone. |
 | `-ThrottleLimit` | `5` | Maximum number of VMs processed concurrently. |
 | `-WhatIf` | off | Simulation: lists what would be done without doing it. |
 
 Boolean parameters take the `-Name:$false` form, e.g. `./scripts/StartAzVM.ps1 -StartAfter:$false`.
 
+> `-StartAll` makes the script usable as the daily "start the lab" command: a VM stopped by the
+> nightly auto-shutdown is started even when its disks are already at the target SKU. A VM the
+> script deallocated itself is still governed by `-StartAfter`, so `-StartAfter:$false` leaves it
+> stopped. Use `-StartAll:$false` to only restart the VMs whose disks were changed.
+>
 > The script no longer defaults to a dry run: run it with `-WhatIf` to simulate.
 > `-Confirm` is not supported, because the VMs are processed in parallel runspaces.
 

@@ -201,6 +201,64 @@ Describe 'Invoke-VMStart' {
     }
 }
 
+Describe 'Test-VMStartRequired' {
+    It 'requires a start for a deallocated or stopped VM' {
+        Test-VMStartRequired -PowerState 'VM deallocated' | Should -BeTrue
+        Test-VMStartRequired -PowerState 'VM stopped' | Should -BeTrue
+    }
+
+    It 'does not start a running VM' {
+        Test-VMStartRequired -PowerState 'VM running' | Should -BeFalse
+    }
+
+    It 'leaves transitional states alone' {
+        foreach ($state in 'VM starting', 'VM stopping', 'VM deallocating') {
+            Test-VMStartRequired -PowerState $state | Should -BeFalse
+        }
+    }
+
+    It 'does not start a VM whose power state is unknown' {
+        Test-VMStartRequired -PowerState $null | Should -BeFalse
+        Test-VMStartRequired -PowerState '' | Should -BeFalse
+    }
+}
+
+Describe 'Invoke-VMStartIfStopped' {
+    It 'starts a stopped VM and reports it' {
+        $script:azArgs = $null
+        function az { $script:azArgs = $args -join ' '; $global:LASTEXITCODE = 0 }
+        $vm = [pscustomobject]@{ name = 'VM1'; powerState = 'VM deallocated' }
+        $r = Invoke-VMStartIfStopped -VmJson $vm -ResourceGroup 'RG'
+        $r.Action | Should -Be 'Started'
+        $r.Failed | Should -BeFalse
+        $script:azArgs | Should -Match 'vm start -g RG -n VM1'
+    }
+
+    It 'does not call az for a running VM' {
+        $script:azCalled = $false
+        function az { $script:azCalled = $true }
+        $vm = [pscustomobject]@{ name = 'VM1'; powerState = 'VM running' }
+        (Invoke-VMStartIfStopped -VmJson $vm -ResourceGroup 'RG').Action | Should -Be 'Skipped'
+        $script:azCalled | Should -BeFalse
+    }
+
+    It 'issues no start in WhatIf mode but still reports the VM as started' {
+        $script:azCalled = $false
+        function az { $script:azCalled = $true }
+        $vm = [pscustomobject]@{ name = 'VM1'; powerState = 'VM stopped' }
+        (Invoke-VMStartIfStopped -VmJson $vm -ResourceGroup 'RG' -WhatIf).Action | Should -Be 'Started'
+        $script:azCalled | Should -BeFalse
+    }
+
+    It 'reports a failure when az cannot start the VM' {
+        function az { $global:LASTEXITCODE = 1 }
+        $vm = [pscustomobject]@{ name = 'VM1'; powerState = 'VM deallocated' }
+        $r = Invoke-VMStartIfStopped -VmJson $vm -ResourceGroup 'RG'
+        $r.Action | Should -Be 'Started'
+        $r.Failed | Should -BeTrue
+    }
+}
+
 Describe 'Script parameters' {
     It 'exposes the documented defaults and supports -WhatIf' {
         $cmd = Get-Command -Name $script:ScriptPath
@@ -209,6 +267,14 @@ Describe 'Script parameters' {
         $cmd.ScriptBlock.Ast.ParamBlock.Parameters |
             Where-Object { $_.Name.VariablePath.UserPath -eq 'TargetSku' } |
             ForEach-Object { $_.DefaultValue.Value } | Should -Be 'StandardSSD_LRS'
+    }
+
+    It 'starts every stopped VM by default (-StartAll defaults to $true)' {
+        $cmd = Get-Command -Name $script:ScriptPath
+        $cmd.Parameters['StartAll'].ParameterType | Should -Be ([bool])
+        $cmd.ScriptBlock.Ast.ParamBlock.Parameters |
+            Where-Object { $_.Name.VariablePath.UserPath -eq 'StartAll' } |
+            ForEach-Object { $_.DefaultValue.Extent.Text } | Should -Be '$true'
     }
 
     It 'restricts TargetSku to the supported disk SKUs' {
