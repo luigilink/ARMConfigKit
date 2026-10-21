@@ -5,6 +5,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `StartAzVM.ps1 -StartAll` starts every stopped VM, not only the ones whose disks were fixed (#40)
+  - The script used to start a VM only when it had deallocated it itself, i.e. when at least one
+    of its disks needed a SKU change, so a VM stopped by the nightly auto-shutdown stayed stopped
+    whenever its disks were already at the target SKU. The new `-StartAll` parameter (default
+    `$true`) starts every VM of the resource group whose power state is `VM deallocated` or
+    `VM stopped`; running VMs and transitional states are left alone. The VM list is now read with
+    `az vm list -d` to get the power state, the summary gains a `Started` column, `-WhatIf` issues
+    no start, and a failed start is reported and sets exit code 1. A VM the script deallocated
+    itself remains governed by `-StartAfter`. Use `-StartAll:$false` for the previous behaviour.
+
 ### Changed
 
 - `StartAzVM.ps1` now takes parameters and uses the native `-WhatIf` (#38)

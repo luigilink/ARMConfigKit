@@ -26,6 +26,11 @@
 .PARAMETER StartAfter
   Start the VM again if the script deallocated it. Use -StartAfter:$false to leave it stopped.
 
+.PARAMETER StartAll
+  Start every VM of the resource group that is stopped (deallocated or stopped), even when none of
+  its disks needed a SKU change. A VM the script deallocated itself stays governed by -StartAfter.
+  Use -StartAll:$false to only restart the VMs whose disks were changed.
+
 .PARAMETER ThrottleLimit
   Maximum number of VMs processed concurrently.
 
@@ -48,6 +53,8 @@ param(
     [bool]$DeallocateVM = $true,
 
     [bool]$StartAfter = $true,
+
+    [bool]$StartAll = $true,
 
     [ValidateRange(1, 32)]
     [int]$ThrottleLimit = 5
@@ -109,6 +116,35 @@ function Invoke-VMStart {
     }
     $null = az vm start -g $ResourceGroup -n $VmName --only-show-errors
     return $LASTEXITCODE -eq 0
+}
+
+function Test-VMStartRequired {
+    <#
+      Pure decision: should a VM with this power state (as reported by `az vm list -d`, e.g.
+      "VM deallocated") be started? Only fully stopped VMs qualify; running VMs and transitional
+      states (starting / stopping / deallocating) are left alone, and so is an unknown state.
+    #>
+    [OutputType([bool])]
+    param([string]$PowerState)
+    return $PowerState -in @('VM deallocated', 'VM stopped')
+}
+
+function Invoke-VMStartIfStopped {
+    <#
+      Starts the VM when its reported power state says it is stopped. Returns
+      @{ Action = 'Started' | 'Skipped'; Failed = $true/$false }. -WhatIf is honoured through
+      Invoke-VMStart (preference variables flow down the call stack).
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        $VmJson,
+        [string]$ResourceGroup
+    )
+    if (-not (Test-VMStartRequired -PowerState $VmJson.powerState)) {
+        return [pscustomobject]@{ Action = 'Skipped'; Failed = $false }
+    }
+    $ok = Invoke-VMStart -ResourceGroup $ResourceGroup -VmName $VmJson.name
+    return [pscustomobject]@{ Action = 'Started'; Failed = (-not $ok) }
 }
 
 function Get-VMDisk {
@@ -201,11 +237,12 @@ if ($MyInvocation.InvocationName -eq '.') { return }
 
 Write-Host "Listing VMs in resource group '$ResourceGroup'..." -ForegroundColor Cyan
 
+# -d (show details) adds each VM's powerState, needed by -StartAll.
 # Capture raw output and validate the az call before parsing: a non-zero exit
 # code (expired login, wrong/empty resource group, missing permissions) must be
 # surfaced as an error, not silently masked as "no VMs". Invalid/partial JSON
 # would otherwise make ConvertFrom-Json throw an unhandled terminating error.
-$vmListRaw = az vm list -g $ResourceGroup --output json 2>$null
+$vmListRaw = az vm list -g $ResourceGroup -d --output json 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to list VMs in resource group '$ResourceGroup' (az exit code $LASTEXITCODE). Check 'az login', the resource group name and your permissions." -ForegroundColor Red
     exit 1
@@ -232,6 +269,8 @@ $getDiskSkuDef  = ${function:Get-DiskSku}.ToString()
 $setDiskSkuDef  = ${function:Set-DiskSku}.ToString()
 $deallocateDef  = ${function:Invoke-VMDeallocate}.ToString()
 $startDef       = ${function:Invoke-VMStart}.ToString()
+$needStartDef   = ${function:Test-VMStartRequired}.ToString()
+$startIfDef     = ${function:Invoke-VMStartIfStopped}.ToString()
 $getVMDisksDef  = ${function:Get-VMDisk}.ToString()
 $getPlanDef     = ${function:Get-DiskSkuUpdatePlan}.ToString()
 
@@ -253,6 +292,7 @@ $results = $vmList | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
     $deallocateVM  = $using:DeallocateVM
     $whatIf        = $using:dryRun
     $startAfter    = $using:StartAfter
+    $startAll      = $using:StartAll
 
     # Re-create the helper functions inside this runspace from the captured
     # definitions.
@@ -260,6 +300,8 @@ $results = $vmList | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
     ${function:Set-DiskSku} = $using:setDiskSkuDef
     ${function:Invoke-VMDeallocate} = $using:deallocateDef
     ${function:Invoke-VMStart} = $using:startDef
+    ${function:Test-VMStartRequired} = $using:needStartDef
+    ${function:Invoke-VMStartIfStopped} = $using:startIfDef
     ${function:Get-VMDisk} = $using:getVMDisksDef
     ${function:Get-DiskSkuUpdatePlan} = $using:getPlanDef
 
@@ -274,6 +316,31 @@ $results = $vmList | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
         Failed           = 0
         DeallocateFailed = $false
         StillDeallocated = $false
+        Started          = $false
+    }
+
+    # -StartAll step, used on every path where the script has not changed the VM's power state
+    # itself: starts the VM when it is stopped and records the outcome in the result.
+    $startIfStopped = {
+        if (-not $startAll) { return }
+        try {
+            $r = Invoke-VMStartIfStopped -VmJson $vm -ResourceGroup $resourceGroup -WhatIf:$whatIf -ErrorAction Stop
+        }
+        catch {
+            Write-Host "[$vmName] -StartAll failed: $($_.Exception.Message)" -ForegroundColor Red
+            $result.Failed++
+            return
+        }
+        if ($r.Action -eq 'Started') {
+            $prefix = if ($whatIf) { 'What if: would start stopped VM' } else { 'Starting stopped VM' }
+            Write-Host "[$vmName] $prefix ($($vm.powerState))." -ForegroundColor Magenta
+            if ($r.Failed) {
+                Write-Host "[$vmName] Failed to start VM. Please check the portal/CLI." -ForegroundColor Red
+                $result.StillDeallocated = $true
+                $result.Failed++
+            }
+            else { $result.Started = $true }
+        }
     }
 
     Write-Host "`n===== VM: $vmName =====" -ForegroundColor Cyan
@@ -300,6 +367,7 @@ $results = $vmList | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
 
     if ($diskIds.Count -eq 0) {
         Write-Host "[$vmName] Nothing to do." -ForegroundColor DarkGray
+        & $startIfStopped
         return $result
     }
 
@@ -316,6 +384,7 @@ $results = $vmList | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
         if ($result.Failed -eq 0) {
             Write-Host "[$vmName] All disks already at $targetSku (or skipped)." -ForegroundColor Green
         }
+        & $startIfStopped
         return $result
     }
 
@@ -355,7 +424,12 @@ $results = $vmList | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
             $result.StillDeallocated = $true
             $result.Failed++
         }
+        else { $result.Started = $true }
     }
+
+    # The script left the VM's power state untouched (disks changed without a deallocate), so
+    # apply -StartAll. A VM the script deallocated stays governed by -StartAfter above.
+    if (-not $wasDeallocated) { & $startIfStopped }
 
     return $result
 }
@@ -366,7 +440,7 @@ $results = $vmList | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
 Write-Host "`n===== Summary =====" -ForegroundColor Cyan
 $results |
     Sort-Object VmName |
-    Format-Table VmName, Updated, Failed, DeallocateFailed, StillDeallocated -AutoSize |
+    Format-Table VmName, Updated, Started, Failed, DeallocateFailed, StillDeallocated -AutoSize |
     Out-Host
 
 $failedVms = @($results | Where-Object { $_.Failed -gt 0 -or $_.StillDeallocated -or $_.DeallocateFailed })
