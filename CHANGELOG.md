@@ -5,6 +5,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Document overriding the VM topology in `terraform.tfvars` instead of editing `variables.tf` (#36)
+  - `vms_informations` is the only variable that is specific to a given lab, yet it lived as the
+    `default` in the tracked `variables.tf`, so a local topology left that file permanently modified.
+    `variables.tf` keeps a generic default, and `terraform.tfvars.example` now shows a commented
+    `vms_informations` override for the git-ignored `terraform.tfvars`. The README, the Topology and
+    Getting-Started wiki pages point there. A tfvars value replaces the whole map, so the override
+    must list every VM. No infrastructure change: the variable keeps its name, type and default.
+
 ### Added
 
 - Added `scripts/Connect-AzBastionTunnel.ps1` (#34)

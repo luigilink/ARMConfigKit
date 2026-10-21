@@ -9,7 +9,7 @@
 | PowerShell | 7+      | for the helper scripts under `scripts/`          |
 
 You also need an Azure subscription with enough quota for the VM sizes defined in
-`terraform/variables.tf` (`vms_informations`).
+`vms_informations` (default in `terraform/variables.tf`, overridable in `terraform/terraform.tfvars`).
 
 ## 1. Authenticate to Azure
 
