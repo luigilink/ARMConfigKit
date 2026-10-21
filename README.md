@@ -29,8 +29,9 @@ linked by documentation only — this repository contains no DSC content.
 
 The sample provisions a small SharePoint Subscription Edition farm (PDC, PULL, SQL,
 APP, SCH, WFE, OOS, SWM, ARR), but the design is **not limited to a fixed number of
-machines** — the VM list is data-driven (`vms_informations` in
-`terraform/variables.tf`) and SPSConfigKit scales to any number of nodes. See the
+machines** — the VM list is data-driven (`vms_informations`, default in
+`terraform/variables.tf`, overridable in your git-ignored `terraform/terraform.tfvars`)
+and SPSConfigKit scales to any number of nodes. See the
 [Topology](https://github.com/luigilink/ARMConfigKit/wiki/Topology) wiki page for the
 full role/VM breakdown.
 

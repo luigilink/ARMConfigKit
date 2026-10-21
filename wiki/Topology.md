@@ -1,9 +1,10 @@
 # Topology
 
 The sample topology deploys a small farm, but the design is **not limited to a fixed
-number of machines** — the VM list is data-driven (`vms_informations` in
-`terraform/variables.tf`) and SPSConfigKit scales to any number of nodes, so you can
-add or remove servers to match your scenario.
+number of machines** — the VM list is data-driven (`vms_informations`, default in
+`terraform/variables.tf`, overridable in your git-ignored `terraform/terraform.tfvars`)
+and SPSConfigKit scales to any number of nodes, so you can add or remove servers to
+match your scenario.
 
 ## Sample farm
 
@@ -23,8 +24,12 @@ The default sample provisions:
 
 ## Scaling the farm
 
-The VM list is defined by the `vms_informations` variable in
-`terraform/variables.tf`. Add or remove entries to match your scenario — for example a
-single-server lab, or a multi-WFE / multi-APP production-like topology. ARMConfigKit
+The VM list is defined by the `vms_informations` variable. `terraform/variables.tf`
+holds a generic default; to use your own topology, **override it in your git-ignored
+`terraform/terraform.tfvars`** (see `terraform.tfvars.example`) rather than editing
+`variables.tf`, so your lab-specific list never diverges from the repository. A tfvars
+value replaces the whole map, so list every VM, not only the ones that differ. Add or
+remove entries to match your scenario — for example a single-server lab, or a
+multi-WFE / multi-APP production-like topology. ARMConfigKit
 provisions exactly the VMs you declare, and [SPSConfigKit](https://github.com/luigilink/SPSConfigKit)
 configures the SharePoint roles on top of them, so the two kits scale together.

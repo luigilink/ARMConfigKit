@@ -41,3 +41,12 @@ adds_domain_admin_password = "ChangeMe-Str0ng!Passw0rd"
 # Auto-shutdown time (24h HHmm). Set to "9999" to disable the automatic shutdown
 # (e.g. for a production-like farm that should stay running).
 # auto_shutdown_time = "2000"
+
+# Lab topology. variables.tf holds a generic default; override it here to match the
+# VMs you actually want. A tfvars value REPLACES the whole map, so list every VM.
+# vms_informations = {
+#   "pdc"  = { name = "PDC1", PrivateIPAddress = "10.1.1.4",  size = "Standard_D2ads_v5", tags = { role = "PDC" } }
+#   "sql1" = { name = "SQL1", PrivateIPAddress = "10.1.1.11", size = "Standard_D2ads_v5", tags = { role = "SQL" } }
+#   "app1" = { name = "APP1", PrivateIPAddress = "10.1.1.21", size = "Standard_D4as_v5",  tags = { role = "APP" } }
+#   "wfe1" = { name = "WFE1", PrivateIPAddress = "10.1.1.27", size = "Standard_D4as_v5",  tags = { role = "WFE" } }
+# }
