@@ -158,3 +158,63 @@ Describe 'Set-DiskSku' {
         Set-DiskSku -DiskId '/d/1' -NewSku 'StandardSSD_LRS' | Should -BeFalse
     }
 }
+
+Describe 'Invoke-VMDeallocate' {
+    It 'does nothing and returns $true in WhatIf mode' {
+        $script:azCalled = $false
+        function az { $script:azCalled = $true }
+        Invoke-VMDeallocate -ResourceGroup 'RG' -VmName 'VM1' -WhatIf | Should -BeTrue
+        $script:azCalled | Should -BeFalse
+    }
+
+    It 'calls az vm deallocate for the right VM and returns $true on success' {
+        $script:azArgs = $null
+        function az { $script:azArgs = $args -join ' '; $global:LASTEXITCODE = 0 }
+        Invoke-VMDeallocate -ResourceGroup 'RG' -VmName 'VM1' | Should -BeTrue
+        $script:azArgs | Should -Match 'vm deallocate -g RG -n VM1'
+    }
+
+    It 'returns $false when az fails' {
+        function az { $global:LASTEXITCODE = 1 }
+        Invoke-VMDeallocate -ResourceGroup 'RG' -VmName 'VM1' | Should -BeFalse
+    }
+}
+
+Describe 'Invoke-VMStart' {
+    It 'does nothing and returns $true in WhatIf mode' {
+        $script:azCalled = $false
+        function az { $script:azCalled = $true }
+        Invoke-VMStart -ResourceGroup 'RG' -VmName 'VM1' -WhatIf | Should -BeTrue
+        $script:azCalled | Should -BeFalse
+    }
+
+    It 'calls az vm start for the right VM and returns $true on success' {
+        $script:azArgs = $null
+        function az { $script:azArgs = $args -join ' '; $global:LASTEXITCODE = 0 }
+        Invoke-VMStart -ResourceGroup 'RG' -VmName 'VM1' | Should -BeTrue
+        $script:azArgs | Should -Match 'vm start -g RG -n VM1'
+    }
+
+    It 'returns $false when az fails' {
+        function az { $global:LASTEXITCODE = 1 }
+        Invoke-VMStart -ResourceGroup 'RG' -VmName 'VM1' | Should -BeFalse
+    }
+}
+
+Describe 'Script parameters' {
+    It 'exposes the documented defaults and supports -WhatIf' {
+        $cmd = Get-Command -Name $script:ScriptPath
+        $cmd.Parameters['ResourceGroup'].ParameterType | Should -Be ([string])
+        $cmd.Parameters.ContainsKey('WhatIf') | Should -BeTrue
+        $cmd.ScriptBlock.Ast.ParamBlock.Parameters |
+            Where-Object { $_.Name.VariablePath.UserPath -eq 'TargetSku' } |
+            ForEach-Object { $_.DefaultValue.Value } | Should -Be 'StandardSSD_LRS'
+    }
+
+    It 'restricts TargetSku to the supported disk SKUs' {
+        $cmd = Get-Command -Name $script:ScriptPath
+        $set = $cmd.Parameters['TargetSku'].Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] }
+        $set.ValidValues | Should -Contain 'StandardSSD_LRS'
+        $set.ValidValues | Should -Not -Contain 'Foo'
+    }
+}
