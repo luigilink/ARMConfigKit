@@ -5,6 +5,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Record the validated Terraform versions and fix the Terraform prerequisite in the wiki (#42)
+  - There was no record of which Terraform versions had been exercised, and the three places that
+    mention a version disagreed: `required_version = ">= 1.14.0"` in `main.tf`, the CI pinned to
+    `1.15.5`, and a `≥ 1.5` prerequisite in the Getting-Started wiki page that `required_version`
+    would refuse. The prerequisite is corrected to `≥ 1.14` and a *Terraform versions* section lists
+    what has been validated. Terraform 1.17.1 passed `init -backend=false`, `validate`, `fmt -check`
+    and a read-only `plan` identical to 1.15.5 on a copy of the project (2026-10-30). **`apply` has
+    not been tested with 1.17.1**, and the section advises backing up `terraform.tfstate` before the
+    first apply with a new version. `required_version` is unchanged: its floor is already above every
+    module's (the highest is 1.10), the modules already cap Terraform below 2.0, and tightening it
+    would exclude 1.17.1. Documentation only: no change to `main.tf`, the CI
+    pin, the state or the tfvars.
+
 ### Added
 
 - `StartAzVM.ps1 -StartAll` starts every stopped VM, not only the ones whose disks were fixed (#40)
